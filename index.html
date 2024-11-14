@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Image 2 Sand</title>
+    <script async src="https://docs.opencv.org/4.x/opencv.js"></script>
+    <style>
+        .container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-around;
+        }
+        .canvas-container {
+            margin: 10px;
+            flex: 1 0 calc(25% - 20px);
+        }
+        .canvas-container img, .canvas-container canvas {
+            max-width: 100%;
+            height: auto;
+            display: block;
+        }
+        @media (max-width: 1200px) {
+            .canvas-container {
+                flex: 1 0 calc(50% - 20px);
+            }
+        }
+        @media (max-width: 600px) {
+            .canvas-container {
+                flex: 1 0 100%;
+            }
+        }
+    </style>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('image-input').addEventListener('change', handleImageUpload);
+            document.getElementById('generate-button').addEventListener('click', generatePuzzle);
+        });
+
+        let originalImageElement = null;
+
+        function handleImageUpload(event) {
+            const reader = new FileReader();
+            reader.onload = e => {
+                if (originalImageElement) {
+                    originalImageElement.src = e.target.result;
+                } else {
+                    originalImageElement = new Image();
+                    originalImageElement.src = e.target.result;
+                    document.getElementById('original-image').appendChild(originalImageElement);
+                }
+                originalImageElement.onload = () => processImage(originalImageElement);
+            };
+            reader.readAsDataURL(event.target.files[0]);
+
+            const pageWidth = window.innerWidth;
+            const imageWidth = originalImageElement.naturalWidth;
+            const maxCanvasWidth = Math.min(imageWidth, pageWidth / 4);
+            const maxCanvasHeight = maxCanvasWidth * (originalImageElement.naturalHeight / imageWidth);
+
+        }
+
+        function processImage(imgElement) {
+            const src = cv.imread(imgElement), dst = new cv.Mat();
+            cv.cvtColor(src, src, cv.COLOR_RGBA2GRAY, 0);
+            cv.Canny(src, dst, 50, 150, 3, false);
+
+            // Add morphological operations
+            const kernel = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(3, 3));
+            cv.dilate(dst, dst, kernel);
+            cv.erode(dst, dst, kernel);
+
+            cv.imshow('edge-image', dst);
+            generateDots(dst);
+            src.delete(); dst.delete();
+        }
+
+        function generateDots(edgeImage) {
+            const maxDots = parseInt(document.getElementById('dot-number').value), 
+                epsilon = parseFloat(document.getElementById('epsilon-value').value),
+                contours = new cv.MatVector(), hierarchy = new cv.Mat();
+            cv.findContours(edgeImage, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
+
+            let points = [];
+            for (let i = 0; i < contours.size(); ++i) {
+                const contour = contours.get(i), simplified = new cv.Mat();
+                cv.approxPolyDP(contour, simplified, epsilon, true);
+                for (let j = 0; j < simplified.rows; ++j) {
+                    const point = simplified.intPtr(j);
+                    points.push({ x: point[0], y: point[1] });
+                }
+                simplified.delete();
+            }
+
+            points = Array.from(new Set(points.map(JSON.stringify))).map(JSON.parse);
+            const sampledPoints = [], interval = Math.max(1, points.length / maxDots);
+            for (let i = 0; i < points.length && sampledPoints.length < maxDots; i += interval) {
+                sampledPoints.push(points[Math.floor(i)]);
+            }
+
+            drawDots(sampledPoints);
+            drawConnections(sampledPoints);
+            document.getElementById('total-dots').innerText = `Total Points: ${sampledPoints.length}`;
+        }
+
+        // Function to compute the center x and y positions
+        function computeCenter(points) {
+            let totalX = 0, totalY = 0;
+            
+            points.forEach(p => {
+                totalX += p.x;
+                totalY += p.y;
+            });
+            
+            const centerX = totalX / points.length;
+            const centerY = totalY / points.length;
+            
+            return { centerX, centerY };
+        }
+        
+        function drawDots(points) {
+            const canvas = document.getElementById('dot-image'), ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            const width = canvas.width, height = canvas.height;
+            const scaleX = width / originalImageElement.width;
+            const scaleY = height / originalImageElement.height;
+            const scale = Math.min(scaleX, scaleY);
+
+            points = points.map(p => ({ x: (p.x) * scale, y: (p.y) * scale }));
+
+            points.forEach(point => {
+                ctx.beginPath();
+                ctx.arc(point.x, point.y, 2, 0, 2 * Math.PI);
+                ctx.fill();
+            });
+
+            const formattedPoints = points.map(p => `{${p.x.toFixed(2)}, ${p.y.toFixed(2)}}`).join(',\n');
+
+            // Calculate polar coordinates
+            const center = computeCenter(points);
+
+            points = points.map(p => ({ x: p.x - center.centerX, y: p.y - center.centerY }));
+            const polarPoints = points.map(p => {
+                const r = Math.sqrt(p.x * p.x + p.y * p.y);
+                let theta = Math.atan2(p.y, p.x) * (180 / Math.PI); // Convert radians to degrees
+                if (theta < 0) theta += 360; // Ensure theta is between 0 and 360
+                return { r: r * (1000 / Math.max(...points.map(p => Math.sqrt(p.x * p.x + p.y * p.y)))), theta: theta*10 };
+            });
+
+            const formattedPolarPoints = polarPoints.map(p => `{${p.r.toFixed(0)},${p.theta.toFixed(0)}}`).join(',');
+            document.getElementById('polar-coordinates').value = formattedPolarPoints;
+            document.getElementById('polar-coordinates-container').style.display = 'block';
+        }
+
+
+
+        function drawConnections(points) {
+            const canvas = document.getElementById('connect-image'), ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            const width = canvas.width, height = canvas.height;
+            const scaleX = width / originalImageElement.width;
+            const scaleY = height / originalImageElement.height;
+            const scale = Math.min(scaleX, scaleY);
+
+            points = points.map(p => ({ x: p.x * scale, y: p.y * scale }));
+
+            ctx.beginPath();
+            points.forEach((point, idx) => {
+                if (idx === 0) {
+                    ctx.moveTo(point.x, point.y);
+                } else {
+                    ctx.lineTo(point.x, point.y);
+                }
+            });
+            ctx.stroke();
+        }
+
+        function generatePuzzle() {
+            originalImageElement && processImage(originalImageElement);
+        }
+
+    </script>
+</head>
+<body>
+    <h1>Image 2 Sand</h1>
+    <div style="display: flex; gap: 10px; align-items: center;">
+        <input type="file" id="image-input" accept="image/*">
+        <label for="epsilon-value">Epsilon (0.1-10):</label>
+        <input type="number" id="epsilon-value" value="2" min="0.1" max="10" step="0.1">
+        <label for="dot-number">Max number of points:</label>
+        <input type="number" id="dot-number" value="100">
+        <button id="generate-button">Generate Coordinates</button>
+    </div>
+    <br>
+    <div class="container">
+        <div class="canvas-container" id="original-image"></div>
+        <div class="canvas-container">
+            <canvas id="edge-image"></canvas>
+        </div>
+        <div class="canvas-container">
+            <canvas id="dot-image"></canvas>
+        </div>
+        <div class="canvas-container">
+            <canvas id="connect-image"></canvas>
+        </div>
+    </div>
+    <div id="polar-coordinates-container" style="display: none;">
+        <h2>Polar Coordinates to trace image</h2>
+        <textarea id="polar-coordinates" rows="10" cols="50"></textarea><br />
+        <label id="total-dots">Total Points: </label>
+    </div>
+    
+</body>
+</html>
