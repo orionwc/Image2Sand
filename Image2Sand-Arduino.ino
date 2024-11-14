@@ -112,9 +112,9 @@ AccelStepper stepperRadius(4, MOTORR_IN1_PIN, MOTORR_IN3_PIN, MOTORR_IN2_PIN, MO
 
 //Struct used for storing positions of the axes, as well as storing the values of the joystick.
 struct Positions {
-  short int radial;                     //the units for these values are motor steps
-  short int angular;                    
-};       
+  short int radial;                     // the units for these values are motor steps; in DrawPicture the units are scaled from 0-1000
+  short int angular;                    // in DrawPicture the units are degrees * 10
+};                                
 
 //These variables of type Positions (defined above) are for storing gantry positions and joystick values
 Positions currentPositions;       //store the current positions of the axes in this
@@ -135,7 +135,6 @@ Positions pattern_RandomWalk1(Positions current, bool restartPattern = false);  
 Positions pattern_RandomWalk2(Positions current, bool restartPattern = false);                //Random walk 2 (connected by lines)
 Positions pattern_AccidentalButterfly(Positions current, bool restartPattern = false);        //Accidental Butterfly
 Positions pattern_Picture(Positions current, bool restartPattern = false);                    //Custom Picture
-
 
 /**
  * @brief Typedef for storing pointers to pattern-generating functions.
@@ -1905,7 +1904,18 @@ Positions pattern_AccidentalButterfly(Positions current, bool restartPattern = f
   return target;        //Return the target position so that the motion control functions can move to it.
 }
 
-
+/**
+ * HACK BY ORION (AKA: Magicaldroid)
+ *
+ * @brief Generates the next target position to follow the points within pointList
+ *
+ * @param pointList An array of all the points in the pattern stored in a Positions struct.
+ * @param current The current position of the gantry, represented as a Positions struct.
+ * @param nodes Total number of points in the pattern
+ * 
+ * @return Positions The next target position for the motion controller, represented as a Positions struct.
+ * 
+ */
 Positions drawPictureStep(Positions pointList[], int nodes, Positions current)
 {
   Positions target;
@@ -1944,7 +1954,7 @@ Positions pattern_Picture(Positions current, bool restartPattern = false) {
 
 
   Positions pointList[] = {
-    // Paste in Picture Here (or use one of the pre-made images below)
+    // Paste in image coordinates here (or uncomment one of the pre-made options below)
 
     // CrunchLabs Logo
     {919,2600},{923,2535},{916,2493},{929,2474},{937,2381},{948,2282},{957,2166},{963,2072},{975,1940},{976,1842},{982,1762},{994,1634},{996,1510},{978,1504},{687,1568},{628,1618},{630,1721},{625,1815},{609,1966},{604,2029},{591,2132},{576,2298},{572,2372},{566,2493},{562,2550},{550,2705},{546,2843},{537,2979},{532,3136},{532,3225},{520,3243},{457,3250},{279,2464},{262,1790},{270,1659},{349,1075},{496,422},{525,413},{568,420},{582,445},{595,591},{603,661},{614,773},{622,851},{632,1014},{627,1047},{645,1100},{682,1132},{976,1200},{1000,1192},{998,1106},{987,1087},{992,1004},{989,901},{982,833},{966,754},{975,734},{968,664},{961,554},{950,435},{942,343},{930,201},{913,155},{918,84},{909,3564},{906,3445},{896,3383},{905,3358},{896,3330},{904,3294},{902,3185},{902,3077},{904,2964},{895,2952},{904,2898},{895,2867},{904,2839},{909,2755} 
@@ -2013,9 +2023,6 @@ NOTES:
 
 
 
-
-  Hey, 2024. We made it to today's date.
-
 POSSIBLE IMPROVEMENTS TO MAKE:
 - Add backlash compensation. The motor gearboxes have backlash, as do the drive belts and pulleys. Every time the motor
 switches direction, it has to spin a bit to take up all the slack before actually moving the gantry. It works fine as it is,
@@ -2033,4 +2040,3 @@ that would ensure that the ball always moves at the same speed. Requires more ad
 Note that I have a hack in place for this that makes the speed of the angular motor inversely proportional to the radius.
 It actually works pretty well, but isn't the same as normalized speed.
 */
-//Hack by Orion (AKA: Magicaldroid)
