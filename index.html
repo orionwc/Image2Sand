@@ -1,6 +1,15 @@
+<!-- Copyright ORION W CROOK 2024. MIT License -->
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image 2 Sand</title>
+    <link rel="stylesheet" href="styles.css">
+<!--
+    <script src="script.js"></script>
+-->
     <meta charset="UTF-8">
     <title>Image 2 Sand</title>
     <script async src="https://docs.opencv.org/4.x/opencv.js"></script>
@@ -31,33 +40,83 @@
         }
     </style>
     <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            document.getElementById('image-input').addEventListener('change', handleImageUpload);
-            document.getElementById('generate-button').addEventListener('click', generatePuzzle);
+
+        document.addEventListener('DOMContentLoaded', function() {
+            const fileInput = document.getElementById('file-input');
+            const fileButton = document.getElementById('file-button');
+            const fileNameDisplay = document.getElementById('file-name');
+            const generateButton = document.getElementById('generate-button');
+            const epsilonSlider = document.getElementById('epsilon-slider');
+            const epsilonValueDisplay = document.getElementById('epsilon-value-display');
+            const dotNumberInput = document.getElementById('dot-number');
+            const contourModeSelect = document.getElementById('contour-mode');
+            //const gaussianBlurToggle = document.getElementById('gaussian-blur-toggle');
+
+            generateButton.addEventListener('click', convertImage);
+
+            fileButton.addEventListener('click', function() {
+                fileInput.click();
+            });
+
+            fileInput.addEventListener('change', function(event) {
+                const file = event.target.files[0];
+                if (file) {
+                    fileNameDisplay.textContent = file.name;
+                    handleImageUpload(event);
+                }
+            });
+
+            epsilonSlider.addEventListener('input', function() {
+                epsilonValueDisplay.textContent = epsilonSlider.value;
+                // convertImage(); // Automatically run convertImage on change
+            });
+
+            // dotNumberInput.addEventListener('input', convertImage); // Automatically run convertImage on change
+            // contourModeSelect.addEventListener('change', convertImage); // Automatically run convertImage on change
+            // gaussianBlurToggle.addEventListener('change', convertImage); // Automatically run convertImage on change
         });
 
         let originalImageElement = null;
 
         function handleImageUpload(event) {
+            const file = event.target.files[0];
             const reader = new FileReader();
+
             reader.onload = e => {
-                if (originalImageElement) {
-                    originalImageElement.src = e.target.result;
-                } else {
+                if (!originalImageElement) {
                     originalImageElement = new Image();
-                    originalImageElement.src = e.target.result;
+                    originalImageElement.id = 'uploaded-image';
+                    originalImageElement.onload = () => {
+                        // Draw the original image on the original-image canvas
+                        const canvas = document.getElementById('original-image');
+                        const ctx = canvas.getContext('2d');
+                        canvas.width = originalImageElement.naturalWidth;
+                        canvas.height = originalImageElement.naturalHeight;
+                        ctx.drawImage(originalImageElement, 0, 0, canvas.width, canvas.height);
+
+                        // Process the image after drawing it on the canvas
+                        processImage(originalImageElement);
+
+                        // Ensure grid height does not exceed 70% of the viewport height
+                        const gridHeight = document.querySelector('.grid').clientHeight;
+                        const viewportHeight = window.innerHeight * 0.7;
+                        if (gridHeight > viewportHeight) {
+                            document.querySelector('.grid').style.height = `${viewportHeight}px`;
+                        }
+                    };
                     document.getElementById('original-image').appendChild(originalImageElement);
                 }
-                originalImageElement.onload = () => processImage(originalImageElement);
+                originalImageElement.src = e.target.result;
             };
-            reader.readAsDataURL(event.target.files[0]);
 
-            const pageWidth = window.innerWidth;
-            const imageWidth = originalImageElement.naturalWidth;
-            const maxCanvasWidth = Math.min(imageWidth, pageWidth / 4);
-            const maxCanvasHeight = maxCanvasWidth * (originalImageElement.naturalHeight / imageWidth);
-
+            reader.readAsDataURL(file);
         }
+
+        // function downsamplePoints(points, maxPoints) {
+        //     if (points.length <= maxPoints) return points;
+        //     const step = Math.ceil(points.length / maxPoints);
+        //     return points.filter((point, index) => index % step === 0).slice(0, maxPoints);
+        // }
 
         function processImage(imgElement) {
             const src = cv.imread(imgElement), dst = new cv.Mat();
@@ -68,54 +127,257 @@
             const kernel = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(3, 3));
             cv.dilate(dst, dst, kernel);
             cv.erode(dst, dst, kernel);
+            // Invert the colors of the detected edges image
+            cv.bitwise_not(dst, dst);
 
             cv.imshow('edge-image', dst);
+            cv.bitwise_not(dst, dst);
             generateDots(dst);
             src.delete(); dst.delete();
         }
 
-        function generateDots(edgeImage) {
-            const maxDots = parseInt(document.getElementById('dot-number').value), 
-                epsilon = parseFloat(document.getElementById('epsilon-value').value),
-                contours = new cv.MatVector(), hierarchy = new cv.Mat();
-            cv.findContours(edgeImage, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
+        function closeContour(points) {
+            if (points.length > 1 && points[0].x !== points[points.length - 1].x && points[0].y !== points[points.length - 1].y) {
+                points.push(points[0]);
+            }
+            return points;
+        }
 
-            let points = [];
-            for (let i = 0; i < contours.size(); ++i) {
+        function findNearestPoint(lastPoint, contours, visitedPoints) {
+            let nearestPoint = null;
+            let nearestDistance = Infinity;
+
+            contours.forEach(contour => {
+                contour.forEach(point => {
+                    if (!point || visitedPoints.has(JSON.stringify(point))) return;
+
+                    const distance = Math.sqrt(
+                        Math.pow(lastPoint.x - point.x, 2) + 
+                        Math.pow(lastPoint.y - point.y, 2)
+                    );
+
+                    if (distance < nearestDistance) {
+                        nearestDistance = distance;
+                        nearestPoint = point;
+                    }
+                });
+            });
+
+            return nearestPoint;
+        }
+
+        function calculateRetraceDistance(orderedContours, startPoint, endPoint) {
+            let retraceDistance = 0;
+            let lastPoint = startPoint;
+
+            for (let i = 0; i < orderedContours.length - 1; i++) {
+                const p1 = orderedContours[i];
+                const p2 = orderedContours[i + 1];
+                retraceDistance += Math.sqrt(
+                    Math.pow(p2.x - p1.x, 2) +
+                    Math.pow(p2.y - p1.y, 2)
+                );
+                lastPoint = p2;
+            }
+
+            // Include the distance from the last point to the end point
+            retraceDistance += Math.sqrt(
+                Math.pow(endPoint.x - lastPoint.x, 2) +
+                Math.pow(endPoint.y - lastPoint.y, 2)
+            );
+
+            return retraceDistance;
+        }
+
+
+        function findMaximalCenter(points) {
+            const minX = Math.min(...points.map(p => p.x));
+            const maxX = Math.max(...points.map(p => p.x));
+            const minY = Math.min(...points.map(p => p.y));
+            const maxY = Math.max(...points.map(p => p.y));
+
+            const centerX = (minX + maxX) / 2;
+            const centerY = (minY + maxY) / 2;
+
+            const width = maxX - minX;
+            const height = maxY - minY;
+
+            return { centerX, centerY, width, height };
+        }
+
+
+        function resetCanvas(canvasId) {
+            const canvas = document.getElementById(canvasId);
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            // Reset transformation matrix
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
+        }
+
+
+        function generateDots(edgeImage) {
+            // Reset the canvas before drawing the new image
+            resetCanvas('dot-image');
+            resetCanvas('connect-image');
+
+            //const maxDots = parseInt(document.getElementById('dot-number').value), 
+            const    epsilon = parseFloat(document.getElementById('epsilon-slider').value),
+                contourMode = document.getElementById('contour-mode').value,
+                //useGaussianBlur = document.getElementById('gaussian-blur-toggle').checked,
+                contours = new cv.MatVector(), hierarchy = new cv.Mat();
+            
+            const retrievalMode = (contourMode === 'cv.RETR_TREE') ? cv.RETR_TREE : cv.RETR_EXTERNAL;
+
+            // Check if Gaussian Blur should be applied
+            /*
+            if (useGaussianBlur) {
+                // Convert the edge image to grayscale
+                let gray = new cv.Mat();
+                cv.cvtColor(edgeImage, gray, cv.COLOR_RGBA2GRAY, 0);
+
+                // Apply Gaussian Blur
+                let blurred = new cv.Mat();
+                cv.GaussianBlur(gray, blurred, new cv.Size(5, 5), 0, 0, cv.BORDER_DEFAULT);
+                gray.delete();  // Free up memory
+
+                // Use blurred image for contour detection
+                cv.findContours(blurred, contours, hierarchy, retrievalMode, cv.CHAIN_APPROX_SIMPLE);
+                blurred.delete();  // Free up memory
+            
+            } else {
+            */
+            // Use the original edge image for contour detection
+            cv.findContours(edgeImage, contours, hierarchy, retrievalMode, cv.CHAIN_APPROX_SIMPLE);
+
+            let contourPoints = [];
+            for (let i = 0; i < contours.size(); i++) {
                 const contour = contours.get(i), simplified = new cv.Mat();
                 cv.approxPolyDP(contour, simplified, epsilon, true);
-                for (let j = 0; j < simplified.rows; ++j) {
+                let points = [];
+                for (let j = 0; j < simplified.rows; j++) {
                     const point = simplified.intPtr(j);
                     points.push({ x: point[0], y: point[1] });
                 }
                 simplified.delete();
+                contourPoints.push(closeContour(points));
             }
 
-            points = Array.from(new Set(points.map(JSON.stringify))).map(JSON.parse);
-            const sampledPoints = [], interval = Math.max(1, points.length / maxDots);
-            for (let i = 0; i < points.length && sampledPoints.length < maxDots; i += interval) {
-                sampledPoints.push(points[Math.floor(i)]);
-            }
+            // Flatten and remove duplicates
+            let points = Array.from(new Set(contourPoints.flat().map(p => JSON.stringify(p)))).map(JSON.parse);
 
-            drawDots(sampledPoints);
-            drawConnections(sampledPoints);
-            document.getElementById('total-dots').innerText = `Total Points: ${sampledPoints.length}`;
+            // Find the centroid and dimensions
+            const center = findMaximalCenter(points),
+                furthest = findFurthestContourFromCentroid(contourPoints, center);
+
+            // Start from the first point on the furthest contour
+            points = furthest.concat(points.filter(p => !furthest.includes(p)));
+
+            const maxDimension = Math.max(center.width, center.height),
+                maxDistance = 0.05 * maxDimension,
+                smallRegionProportion = 0.05,
+                penaltyFactor = 10;
+
+            let orderedPoints = orderContoursByDistance(contourPoints, maxDistance, smallRegionProportion, penaltyFactor);
+
+            // Sample points to meet the maxDots requirement
+            //const sampledPoints = [], interval = Math.max(1, orderedPoints.length / maxDots);
+            //for (let i = 0; i < orderedPoints.length && sampledPoints.length < maxDots; i += interval) {
+            //    sampledPoints.push(orderedPoints[Math.floor(i)]);
+            //}
+
+            const polarPoints = drawDots(orderedPoints);
+            drawConnections(polarPoints);
+            document.getElementById('total-points').innerText = `(${orderedPoints.length} Points)`;
         }
 
-        // Function to compute the center x and y positions
-        function computeCenter(points) {
-            let totalX = 0, totalY = 0;
-            
+
+
+
+        function calculatePenalizedDistance(start, end, points, penalty) {
+            // Direct distance
+            const direct = Math.hypot(start.x - end.x, start.y - end.y);
+
+            // Calculate retrace distance through all points
+            let retrace = 0, last = start;
             points.forEach(p => {
-                totalX += p.x;
-                totalY += p.y;
+                if (Array.isArray(p)) return;
+                retrace += Math.hypot(p.x - last.x, p.y - last.y);
+                last = p;
             });
-            
-            const centerX = totalX / points.length;
-            const centerY = totalY / points.length;
-            
-            return { centerX, centerY };
+            retrace += Math.hypot(end.x - last.x, end.y - last.y);
+
+            // Apply penalty to the jump distance
+            const jump = Math.hypot(start.x - end.x, start.y - end.y);
+            const penalized = direct + (jump * penalty);
+
+            return Math.min(retrace, penalized);
         }
+
+
+
+        function orderContoursByDistance(contours, maxDist, smallProp, penalty) {
+            if (!contours.length) return [];
+            let ordered = [contours[0]], remaining = contours.slice(1);
+            let last = contours[0][contours[0].length - 1];
+
+            const totalPts = contours.flat().length;
+            const smallThresh = totalPts * smallProp;
+
+            while (remaining.length) {
+                let nearest = { index: 0, dist: Infinity, insertIdx: 0 };
+
+                remaining.forEach((contour, i) => {
+                    contour.forEach((pt, j) => {
+                        if (!pt || !last) return;
+
+                        let dist = Math.hypot(last.x - pt.x, last.y - pt.y);
+                        const penalizedDist = calculatePenalizedDistance(last, pt, ordered.concat(contour.slice(j)), penalty);
+
+                        if (penalizedDist < nearest.dist) {
+                            nearest = { index: i, dist: penalizedDist, insertIdx: j };
+                        }
+                    });
+                });
+
+                let closestContour = remaining.splice(nearest.index, 1)[0];
+                if (!closestContour) continue;
+
+                if (nearest.dist <= maxDist || closestContour.length > smallThresh) {
+                    ordered.push(closestContour.slice(nearest.insertIdx).concat(closestContour.slice(0, nearest.insertIdx)));
+                }
+
+                last = ordered[ordered.length - 1][ordered[ordered.length - 1].length - 1];
+            }
+            return ordered.flat();
+        }
+
+
+        function calculateCentroid(points) {
+            let sumX = 0, sumY = 0;
+            points.forEach(p => {
+                sumX += p.x;
+                sumY += p.y;
+            });
+            return { x: sumX / points.length, y: sumY / points.length };
+        }
+
+        function findFurthestContourFromCentroid(contours, centroid) {
+            let furthestContour = contours[0];
+            let maxDistance = 0;
+
+            contours.forEach(contour => {
+                contour.forEach(point => {
+                    let distance = Math.sqrt(Math.pow(point.x - centroid.x, 2) + Math.pow(point.y - centroid.y, 2));
+                    if (distance > maxDistance) {
+                        maxDistance = distance;
+                        furthestContour = contour;
+                    }
+                });
+            });
+
+            return furthestContour;
+        }
+
         
         function drawDots(points) {
             const canvas = document.getElementById('dot-image'), ctx = canvas.getContext('2d');
@@ -137,79 +399,147 @@
             const formattedPoints = points.map(p => `{${p.x.toFixed(2)}, ${p.y.toFixed(2)}}`).join(',\n');
 
             // Calculate polar coordinates
-            const center = computeCenter(points);
+            const center = findMaximalCenter(points);
 
             points = points.map(p => ({ x: p.x - center.centerX, y: p.y - center.centerY }));
             const polarPoints = points.map(p => {
                 const r = Math.sqrt(p.x * p.x + p.y * p.y);
                 let theta = Math.atan2(p.y, p.x) * (180 / Math.PI); // Convert radians to degrees
                 if (theta < 0) theta += 360; // Ensure theta is between 0 and 360
-                return { r: r * (1000 / Math.max(...points.map(p => Math.sqrt(p.x * p.x + p.y * p.y)))), theta: theta*10 };
+
+                // Adjust theta to align 0 degrees to the right and 90 degrees up by flipping the y-axis
+                theta = -theta;
+                if (theta < 0) theta += 360;
+
+                return { r: r * (1000 / Math.max(...points.map(p => Math.sqrt(p.x * p.x + p.y * p.y)))), theta: theta * 10 };
             });
 
             const formattedPolarPoints = polarPoints.map(p => `{${p.r.toFixed(0)},${p.theta.toFixed(0)}}`).join(',');
-            document.getElementById('polar-coordinates').value = formattedPolarPoints;
-            document.getElementById('polar-coordinates-container').style.display = 'block';
+            document.getElementById('polar-coordinates-textarea').value = formattedPolarPoints;
+            //document.getElementById('polar-coordinates-container').style.display = 'block';
+
+            return polarPoints; // Return polarPoints
         }
 
 
 
-        function drawConnections(points) {
+
+        function drawConnections(polarPoints) {
             const canvas = document.getElementById('connect-image'), ctx = canvas.getContext('2d');
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
             const width = canvas.width, height = canvas.height;
-            const scaleX = width / originalImageElement.width;
-            const scaleY = height / originalImageElement.height;
+
+            // Reset transformation matrix
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
+
+            // Translate the context to the center of the canvas
+            ctx.translate(width / 2, height / 2);
+
+            // Scale the points based on the size of the original image
+            const scaleX = width / 2000; // Since the circle radius is 1000
+            const scaleY = height / 2000;
             const scale = Math.min(scaleX, scaleY);
 
-            points = points.map(p => ({ x: p.x * scale, y: p.y * scale }));
-
+            // Draw the outline circle
             ctx.beginPath();
-            points.forEach((point, idx) => {
-                if (idx === 0) {
-                    ctx.moveTo(point.x, point.y);
-                } else {
-                    ctx.lineTo(point.x, point.y);
-                }
-            });
+            ctx.arc(0, 0, 1000 * scale, 0, 2 * Math.PI);
+            ctx.strokeStyle = 'black';
             ctx.stroke();
+
+            // Draw the connections based on polar coordinates
+            for (let i = 0; i < polarPoints.length - 1; i++) {
+                // Calculate the color for each segment
+                const t = i / (polarPoints.length - 1);
+                const color = `hsl(${t * 270}, 100%, 50%)`; // 270 degrees covers red to violet
+                ctx.strokeStyle = color;
+
+                const p1 = polarPoints[i];
+                const p2 = polarPoints[i + 1];
+
+                // Adjust y-coordinate calculation to invert the y-axis
+                const x1 = p1.r * Math.cos(p1.theta / 10 * Math.PI / 180) * scale;
+                const y1 = -p1.r * Math.sin(p1.theta / 10 * Math.PI / 180) * scale;
+                const x2 = p2.r * Math.cos(p2.theta / 10 * Math.PI / 180) * scale;
+                const y2 = -p2.r * Math.sin(p2.theta / 10 * Math.PI / 180) * scale;
+
+                ctx.beginPath();
+                ctx.moveTo(x1, y1);
+                ctx.lineTo(x2, y2);
+                ctx.stroke();
+            }
         }
 
-        function generatePuzzle() {
+
+
+
+        function convertImage() {
             originalImageElement && processImage(originalImageElement);
         }
 
     </script>
 </head>
+
 <body>
-    <h1>Image 2 Sand</h1>
-    <div style="display: flex; gap: 10px; align-items: center;">
-        <input type="file" id="image-input" accept="image/*">
-        <label for="epsilon-value">Epsilon (0.1-10):</label>
-        <input type="number" id="epsilon-value" value="2" min="0.1" max="10" step="0.1">
-        <label for="dot-number">Max number of points:</label>
-        <input type="number" id="dot-number" value="100">
-        <button id="generate-button">Generate Coordinates</button>
-    </div>
-    <br>
     <div class="container">
-        <div class="canvas-container" id="original-image"></div>
-        <div class="canvas-container">
-            <canvas id="edge-image"></canvas>
-        </div>
-        <div class="canvas-container">
-            <canvas id="dot-image"></canvas>
-        </div>
-        <div class="canvas-container">
-            <canvas id="connect-image"></canvas>
+        <div class="grid">
+            <div class="grid-item span-full-width">
+                <h1 class="page-title">Image 2 Sand</h1>
+            </div>
+            <div class="grid-item">
+                <div class="file-input-group">
+                    <input type="file" id="file-input" style="display: none;" accept="image/*">
+                    <button id="file-button"><img src="open-file-icon.png" alt="Open File" style="width: 20px; height: 20px;"></button>
+                    <span id="file-name">No file selected</span>
+                    <button id="generate-button">Generate Coordinates</button>
+                </div>
+            </div>
+            <div class="grid-item advanced-settings">
+                <h3>Advanced Settings</h3>
+                <div class="settings-grid">
+                    <div class="hidden">
+                        <label for="gaussian-blur-toggle">Gaussian blur</label>
+                        <input type="checkbox" id="gaussian-blur-toggle" name="gaussian-blur-toggle">
+                    </div>
+                    <div class="slider-container">
+                        <input type="range" id="epsilon-slider" min="0.1" max="10" step="0.1" value="1" style="width: 100%;">
+                        <span id="epsilon-value-display">1</span>
+                        <div class="slider-labels">
+                            <small>Fine</small>
+                            <small>Coarse</small>
+                        </div>
+                    </div>
+                    <div>
+                        <label for="contour-mode">Contour Mode</label>
+                        <select id="contour-mode">
+                            <option value="cv.RETR_EXTERNAL">External</option>
+                            <option value="cv.RETR_TREE">Tree</option>
+                        </select>
+                    </div>
+                </div>
+            </div>            
+            <div class="grid-item">
+                <h4>Original Image</h4>
+                <canvas id="original-image"></canvas>
+            </div>
+            <div class="grid-item">
+                <h4>Detected Edges</h4>
+                <canvas id="edge-image"></canvas>
+            </div>
+            <div class="grid-item">
+                <h4>Identified Points</h4>
+                <canvas id="dot-image"></canvas>
+            </div>
+            <div class="grid-item">
+                <h4>Sand Garden Image</h4>
+                <canvas id="connect-image"></canvas>
+            </div>
+
+            <div class="grid-item span-full-width">
+                <h4>Polar Coordinates to Trace Image <span id="total-points"></span></h4>
+                <textarea id="polar-coordinates-textarea"></textarea>
+            </div>
         </div>
     </div>
-    <div id="polar-coordinates-container" style="display: none;">
-        <h2>Polar Coordinates to trace image</h2>
-        <textarea id="polar-coordinates" rows="10" cols="50"></textarea><br />
-        <label id="total-dots">Total Points: </label>
-    </div>
-    
 </body>
 </html>
