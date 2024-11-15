@@ -1,0 +1,159 @@
+body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 20px;
+    background-color: #f4f4f4;
+    overflow: auto; /* Enable scrolling on the page */
+}
+
+.container {
+    width: 90%;
+    max-width: 1200px;
+    margin: 0 auto;
+    text-align: center;
+}
+
+.page-title {
+    font-family: 'Verdana', sans-serif; /* Changed to a wider and more rounded font */
+    font-size: 2em;
+    margin-bottom: 20px;
+    color: #333;
+    text-align: center; /* Ensure it's centered */
+}
+
+.grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr); /* Ensure 2 columns */
+    grid-template-rows: auto auto 1fr 1fr auto auto;
+    gap: 10px;
+    margin-top: 20px;
+    max-height: 70vh;
+}
+
+.grid-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background-color: #fff;
+    padding: 10px;
+    border-radius: 8px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    min-width: 300px;
+}
+
+.grid-item h4 {
+    margin: 10px 0;
+    text-align: center; /* Ensure the heading is centered */
+}
+
+canvas {
+    max-width: 100%;
+    max-height: 100%;
+    width: auto;
+    height: auto;
+    display: block;
+    margin: 0 auto; /* Center the canvas */
+}
+
+.file-input-group {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+#file-button {
+    margin-bottom: 10px;
+}
+
+#file-name {
+    font-size: 14px;
+    color: #666;
+    margin-bottom: 10px;
+}
+
+#generate-button {
+    padding: 10px 20px;
+    font-size: 16px;
+}
+
+.advanced-settings {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background-color: #fff;
+    padding: 10px;
+    border-radius: 8px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+}
+
+.hidden {
+    display: none;
+}
+
+.settings-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px 10px; /* Add vertical space between grid items */
+}
+
+.advanced-settings label, .settings-grid div {
+    font-size: 12px; /* Smaller text size for labels */
+}
+
+.slider-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+}
+
+.slider-labels {
+    display: flex;
+    justify-content: space-between;
+    width: 100%;
+    margin-top: -10px; /* Adjust top margin to bring it closer to the slider */
+    text-align: center;
+}
+
+#total-points {
+    font-size: 1em; /* Same size as Polar Coordinates to Trace Image */
+    font-weight: normal; /* Not bold */
+}
+
+.polar-coordinates-container {
+    width: 100%;
+    padding: 10px; /* Add padding to match the grid gap */
+    border-radius: 8px;
+    border: 1px solid #ccc; /* Add a border */
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); /* Add a shadow for better separation */
+}
+
+.polar-coordinates-container h4 {
+    margin-bottom: 5px;
+    text-align: left;
+}
+
+#polar-coordinates-textarea {
+    width: calc(100% - 20px); /* Add left and right padding */
+    height: 100px; /* Decrease height to avoid scroll bars */
+    resize: none;
+    border-radius: 8px;
+    border: 1px solid #ccc;
+    padding: 10px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+}
+
+.span-full-width {
+    grid-column: span 2;
+}
+
+body {
+    overflow-x: hidden; /* Show horizontal scrollbar only when needed */
+}
+
+/* Maintain proportions and minimum width, allowing horizontal scrolling */
+.grid {
+    grid-template-columns: repeat(2, minmax(300px, 1fr));
+    justify-content: center; /* Center the grid */
+}
