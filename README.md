@@ -29,7 +29,7 @@ The website is available at: https://orionwc.github.io/Image2Sand/
 
 ### Other info:
    This runs in javascript locally on the client. There isn't much in the way of validation implemented, but things to be aware of are:
-   -If the images have a lot of identified edges (which often happens for busy photos or images with a high pixel count) then it can take a long time to process.
+   * If the images have a lot of identified edges (which often happens for busy photos or images with a high pixel count) then it can take a long time to process.
 
 ## Part 2
  Adds a pattern to the Aurduino code that traces a sequence of points specified as an array of polar coordinates in the units: r=radial, scaled from 0-1000, and theta = angle in tengths of a degree
