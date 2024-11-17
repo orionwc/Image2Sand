@@ -27,6 +27,15 @@ SOFTWARE.
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Image 2 Sand</title>
+    
+    <!-- Google Tag Manager -->
+<script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+})(window,document,'script','dataLayer','GTM-T2SCV6C5');</script>
+<!-- End Google Tag Manager -->
+    
     <link rel="stylesheet" href="styles.css">
 <!--
     <script src="script.js"></script>
@@ -502,10 +511,17 @@ SOFTWARE.
 </head>
 
 <body>
+    <!-- Google Tag Manager (noscript) -->
+<noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-T2SCV6C5"
+height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+<!-- End Google Tag Manager (noscript) -->
     <div class="container">
         <div class="grid">
             <div class="grid-item span-full-width">
                 <h1 class="page-title">Image 2 Sand</h1>
+                <div class="hidden">
+                    <p><small>To learn more about what this site is for, watch this video: <a href="https://www.youtube.com/@InspiredByOrion">InspiredByOrion</a></small></p>
+                </div>
             </div>
             <div class="grid-item">
                 <div class="file-input-group">
@@ -523,7 +539,7 @@ SOFTWARE.
                         <input type="checkbox" id="gaussian-blur-toggle" name="gaussian-blur-toggle">
                     </div>
                     <div class="slider-container">
-                        <input type="range" id="epsilon-slider" min="0.1" max="10" step="0.1" value="1" style="width: 100%;">
+                        <input type="range" id="epsilon-slider" min="0.1" max="10" step="0.1" value="3" style="width: 100%;">
                         <span id="epsilon-value-display">1</span>
                         <div class="slider-labels">
                             <small>Fine</small>
@@ -534,7 +550,7 @@ SOFTWARE.
                         <label for="contour-mode">Contour Mode</label>
                         <select id="contour-mode">
                             <option value="cv.RETR_EXTERNAL">External</option>
-                            <option value="cv.RETR_TREE">Tree</option>
+                            <option value="cv.RETR_TREE">Tree (experimental)</option>
                         </select>
                     </div>
                 </div>
@@ -560,7 +576,17 @@ SOFTWARE.
                 <h4>Polar Coordinates to Trace Image <span id="total-points"></span></h4>
                 <textarea id="polar-coordinates-textarea"></textarea>
             </div>
+
+            <div class="grid-item span-full-width">
+                <div class="hidden">
+                <iframe width="100%" height="315" src="https://www.youtube.com/embed/<YOUR_VIDEO_ID_HERE>" frameborder="0" allowfullscreen></iframe>
+                </div>
+                <p><small>Web Page by ORION - Youtube: <a href="https://www.youtube.com/@InspiredByOrion">InspiredByOrion</a></small></p>
+            </div>
         </div>
     </div>
+
+</body>
+
 </body>
 </html>
