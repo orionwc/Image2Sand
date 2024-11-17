@@ -49,5 +49,5 @@ See https://github.com/orionwc/Image2Sand/commit/e6f938ae25ba4a1b92c95af3d917c11
 * Better path-finding algorithm
 * Explore improvements to memory utilization so more points can be included
 
-## For more context, see the youtube video linked at the bottom of the web page.
+## For more context, see [the youtube video](https://youtu.be/fOfYCiM7BC8) linked at the bottom of the web page.
 # *If you found this interesting or cool, please *Subscribe to [My Youtube Channel](https://www.youtube.com/@InspiredByOrion) by clicking the link at the bottom of the page.**
