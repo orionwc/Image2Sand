@@ -92,6 +92,8 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
             const contourModeSelect = document.getElementById('contour-mode');
             //const gaussianBlurToggle = document.getElementById('gaussian-blur-toggle');
 
+            document.getElementById('plotButton').addEventListener('click', plotNextContour);
+
             generateButton.addEventListener('click', convertImage);
 
             fileButton.addEventListener('click', function() {
@@ -111,10 +113,31 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                 // convertImage(); // Automatically run convertImage on change
             });
 
-            // dotNumberInput.addEventListener('input', convertImage); // Automatically run convertImage on change
-            // contourModeSelect.addEventListener('change', convertImage); // Automatically run convertImage on change
-            // gaussianBlurToggle.addEventListener('change', convertImage); // Automatically run convertImage on change
         });
+
+        class PriorityQueue {
+            constructor() {
+                this.nodes = [];
+            }
+
+            enqueue(priority, key) {
+                this.nodes.push({ key, priority });
+                this.sort();
+            }
+
+            dequeue() {
+                return this.nodes.shift();
+            }
+
+            sort() {
+                this.nodes.sort((a, b) => a.priority - b.priority);
+            }
+
+            isEmpty() {
+                return !this.nodes.length;
+            }
+        }
+
 
         let originalImageElement = null;
 
@@ -152,12 +175,6 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
             reader.readAsDataURL(file);
         }
 
-        // function downsamplePoints(points, maxPoints) {
-        //     if (points.length <= maxPoints) return points;
-        //     const step = Math.ceil(points.length / maxPoints);
-        //     return points.filter((point, index) => index % step === 0).slice(0, maxPoints);
-        // }
-
         function processImage(imgElement) {
             const src = cv.imread(imgElement), dst = new cv.Mat();
             cv.cvtColor(src, src, cv.COLOR_RGBA2GRAY, 0);
@@ -176,11 +193,86 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
             src.delete(); dst.delete();
         }
 
-        function closeContour(points) {
-            if (points.length > 1 && points[0].x !== points[points.length - 1].x && points[0].y !== points[points.length - 1].y) {
-                points.push(points[0]);
+        let currentContourIndex = 0;
+        let isFirstClick = true;
+
+
+        function adjustEpsilon(epsilon, pointsOver) {
+            if (pointsOver > 100) {
+                return epsilon + 1.0;
+            } else if (pointsOver <= 20) {
+                return epsilon + 0.1;
+            } else {
+                // Scale adjustment for points over the target between 20 and 100
+                let scale = (pointsOver - 20) / (100 - 20); // Normalized to range 0-1
+                return epsilon + 0.1 + 0.9 * scale;  // Adjust between 0.1 and 1.0
             }
-            return points;
+        }
+
+   
+        function plotNextContour() {
+            const canvas = document.getElementById('plotcontours');
+            const ctx = canvas.getContext('2d');
+
+            if (isFirstClick) {
+                // Clear the canvas on first click
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                isFirstClick = false;
+            }
+
+            console.log('Cur Contour: ', currentContourIndex + '/' + orderedContoursSave.length + ":", JSON.stringify(orderedContoursSave[currentContourIndex]));
+
+            if (currentContourIndex < orderedContoursSave.length) {
+                const contour = orderedContoursSave[currentContourIndex];
+                const baseColor = getRandomColor();
+                const [r, g, b] = hexToRgb(baseColor);
+                const length = contour.length;
+
+                contour.forEach((point, i) => {
+                    if (i === 0) {
+                        ctx.beginPath();
+                        ctx.moveTo(point.x, point.y);
+                    } else {
+                        ctx.lineTo(point.x, point.y);
+
+                        // Calculate color fade
+                        const ratio = i / length;
+                        const fadedColor = `rgb(${Math.round(r * (1 - ratio))}, ${Math.round(g * (1 - ratio))}, ${Math.round(b * (1 - ratio))})`;
+                        ctx.strokeStyle = fadedColor;
+                        ctx.lineWidth = 2;
+                        ctx.stroke();
+                        ctx.beginPath();
+                        ctx.moveTo(point.x, point.y);
+                    }
+                });
+
+                // Mark the start and end points
+                ctx.fillStyle = baseColor;
+                ctx.font = '12px Arial';
+
+                // Start point
+                ctx.fillText(`S${currentContourIndex + 1}`, contour[0].x, contour[0].y);
+                ctx.beginPath();
+                ctx.arc(contour[0].x, contour[0].y, 3, 0, 2 * Math.PI);
+                ctx.fill();
+
+                // End point
+                ctx.fillText(`E${currentContourIndex + 1}`, contour[contour.length - 1].x, contour[contour.length - 1].y);
+                ctx.beginPath();
+                ctx.arc(contour[contour.length - 1].x, contour[contour.length - 1].y, 3, 0, 2 * Math.PI);
+                ctx.fill();
+
+                // Label the contour with its number
+                const midPoint = contour[Math.floor(contour.length / 2)];
+                ctx.fillText(`${currentContourIndex + 1}`, midPoint.x, midPoint.y);
+
+                // Increment the contour index
+                currentContourIndex++;
+            } else {
+                alert("All contours have been plotted. Starting over.");
+                currentContourIndex = 0; // Reset the index
+                isFirstClick = true; // Reset the first click flag
+            }
         }
 
         function findNearestPoint(lastPoint, contours, visitedPoints) {
@@ -206,30 +298,6 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
             return nearestPoint;
         }
 
-        function calculateRetraceDistance(orderedContours, startPoint, endPoint) {
-            let retraceDistance = 0;
-            let lastPoint = startPoint;
-
-            for (let i = 0; i < orderedContours.length - 1; i++) {
-                const p1 = orderedContours[i];
-                const p2 = orderedContours[i + 1];
-                retraceDistance += Math.sqrt(
-                    Math.pow(p2.x - p1.x, 2) +
-                    Math.pow(p2.y - p1.y, 2)
-                );
-                lastPoint = p2;
-            }
-
-            // Include the distance from the last point to the end point
-            retraceDistance += Math.sqrt(
-                Math.pow(endPoint.x - lastPoint.x, 2) +
-                Math.pow(endPoint.y - lastPoint.y, 2)
-            );
-
-            return retraceDistance;
-        }
-
-
         function findMaximalCenter(points) {
             const minX = Math.min(...points.map(p => p.x));
             const maxX = Math.max(...points.map(p => p.x));
@@ -246,152 +314,6 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
         }
 
 
-        function resetCanvas(canvasId) {
-            const canvas = document.getElementById(canvasId);
-            const ctx = canvas.getContext('2d');
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            // Reset transformation matrix
-            ctx.setTransform(1, 0, 0, 1, 0, 0);
-        }
-
-
-        function generateDots(edgeImage) {
-            // Reset the canvas before drawing the new image
-            resetCanvas('dot-image');
-            resetCanvas('connect-image');
-
-            //const maxDots = parseInt(document.getElementById('dot-number').value), 
-            const    epsilon = parseFloat(document.getElementById('epsilon-slider').value),
-                contourMode = document.getElementById('contour-mode').value,
-                //useGaussianBlur = document.getElementById('gaussian-blur-toggle').checked,
-                contours = new cv.MatVector(), hierarchy = new cv.Mat();
-            
-            const retrievalMode = (contourMode === 'cv.RETR_TREE') ? cv.RETR_TREE : cv.RETR_EXTERNAL;
-
-            // Check if Gaussian Blur should be applied
-            /*
-            if (useGaussianBlur) {
-                // Convert the edge image to grayscale
-                let gray = new cv.Mat();
-                cv.cvtColor(edgeImage, gray, cv.COLOR_RGBA2GRAY, 0);
-
-                // Apply Gaussian Blur
-                let blurred = new cv.Mat();
-                cv.GaussianBlur(gray, blurred, new cv.Size(5, 5), 0, 0, cv.BORDER_DEFAULT);
-                gray.delete();  // Free up memory
-
-                // Use blurred image for contour detection
-                cv.findContours(blurred, contours, hierarchy, retrievalMode, cv.CHAIN_APPROX_SIMPLE);
-                blurred.delete();  // Free up memory
-            
-            } else {
-            */
-            // Use the original edge image for contour detection
-            cv.findContours(edgeImage, contours, hierarchy, retrievalMode, cv.CHAIN_APPROX_SIMPLE);
-
-            let contourPoints = [];
-            for (let i = 0; i < contours.size(); i++) {
-                const contour = contours.get(i), simplified = new cv.Mat();
-                cv.approxPolyDP(contour, simplified, epsilon, true);
-                let points = [];
-                for (let j = 0; j < simplified.rows; j++) {
-                    const point = simplified.intPtr(j);
-                    points.push({ x: point[0], y: point[1] });
-                }
-                simplified.delete();
-                contourPoints.push(closeContour(points));
-            }
-
-            // Flatten and remove duplicates
-            let points = Array.from(new Set(contourPoints.flat().map(p => JSON.stringify(p)))).map(JSON.parse);
-
-            // Find the centroid and dimensions
-            const center = findMaximalCenter(points),
-                furthest = findFurthestContourFromCentroid(contourPoints, center);
-
-            // Start from the first point on the furthest contour
-            points = furthest.concat(points.filter(p => !furthest.includes(p)));
-
-            const maxDimension = Math.max(center.width, center.height),
-                maxDistance = 0.05 * maxDimension,
-                smallRegionProportion = 0.05,
-                penaltyFactor = 10;
-
-            let orderedPoints = orderContoursByDistance(contourPoints, maxDistance, smallRegionProportion, penaltyFactor);
-
-            // Sample points to meet the maxDots requirement
-            //const sampledPoints = [], interval = Math.max(1, orderedPoints.length / maxDots);
-            //for (let i = 0; i < orderedPoints.length && sampledPoints.length < maxDots; i += interval) {
-            //    sampledPoints.push(orderedPoints[Math.floor(i)]);
-            //}
-
-            const polarPoints = drawDots(orderedPoints);
-            drawConnections(polarPoints);
-            document.getElementById('total-points').innerText = `(${orderedPoints.length} Points)`;
-        }
-
-
-
-
-        function calculatePenalizedDistance(start, end, points, penalty) {
-            // Direct distance
-            const direct = Math.hypot(start.x - end.x, start.y - end.y);
-
-            // Calculate retrace distance through all points
-            let retrace = 0, last = start;
-            points.forEach(p => {
-                if (Array.isArray(p)) return;
-                retrace += Math.hypot(p.x - last.x, p.y - last.y);
-                last = p;
-            });
-            retrace += Math.hypot(end.x - last.x, end.y - last.y);
-
-            // Apply penalty to the jump distance
-            const jump = Math.hypot(start.x - end.x, start.y - end.y);
-            const penalized = direct + (jump * penalty);
-
-            return Math.min(retrace, penalized);
-        }
-
-
-
-        function orderContoursByDistance(contours, maxDist, smallProp, penalty) {
-            if (!contours.length) return [];
-            let ordered = [contours[0]], remaining = contours.slice(1);
-            let last = contours[0][contours[0].length - 1];
-
-            const totalPts = contours.flat().length;
-            const smallThresh = totalPts * smallProp;
-
-            while (remaining.length) {
-                let nearest = { index: 0, dist: Infinity, insertIdx: 0 };
-
-                remaining.forEach((contour, i) => {
-                    contour.forEach((pt, j) => {
-                        if (!pt || !last) return;
-
-                        let dist = Math.hypot(last.x - pt.x, last.y - pt.y);
-                        const penalizedDist = calculatePenalizedDistance(last, pt, ordered.concat(contour.slice(j)), penalty);
-
-                        if (penalizedDist < nearest.dist) {
-                            nearest = { index: i, dist: penalizedDist, insertIdx: j };
-                        }
-                    });
-                });
-
-                let closestContour = remaining.splice(nearest.index, 1)[0];
-                if (!closestContour) continue;
-
-                if (nearest.dist <= maxDist || closestContour.length > smallThresh) {
-                    ordered.push(closestContour.slice(nearest.insertIdx).concat(closestContour.slice(0, nearest.insertIdx)));
-                }
-
-                last = ordered[ordered.length - 1][ordered[ordered.length - 1].length - 1];
-            }
-            return ordered.flat();
-        }
-
-
         function calculateCentroid(points) {
             let sumX = 0, sumY = 0;
             points.forEach(p => {
@@ -401,23 +323,499 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
             return { x: sumX / points.length, y: sumY / points.length };
         }
 
-        function findFurthestContourFromCentroid(contours, centroid) {
-            let furthestContour = contours[0];
-            let maxDistance = 0;
+        function calculateDistances(contours) {
+            const distances = [];
+
+            for (let i = 0; i < contours.length; i++) {
+                distances[i] = [];
+                for (let j = 0; j < contours.length; j++) {
+                    if (i !== j) {
+                        const startToStart = Math.hypot(contours[i][0].x - contours[j][0].x, contours[i][0].y - contours[j][0].y);
+                        const startToEnd = Math.hypot(contours[i][0].x - contours[j][contours[j].length - 1].x, contours[i][0].y - contours[j][contours[j].length - 1].y);
+                        const endToStart = Math.hypot(contours[i][contours[i].length - 1].x - contours[j][0].x, contours[i][contours[i].length - 1].y - contours[j][0].y);
+                        const endToEnd = Math.hypot(contours[i][contours[i].length - 1].x - contours[j][contours[j].length - 1].x, contours[i][contours[i].length - 1].y - contours[j][contours[j].length - 1].y);
+                        distances[i][j] = Math.min(startToStart, startToEnd, endToStart, endToEnd);
+                    }
+                }
+            }
+
+            return distances;
+        }
+
+
+        function tspNearestNeighbor(distances, contours) {
+            const path = [0];
+            const visited = new Set([0]);
+
+            while (path.length < contours.length) {
+                let last = path[path.length - 1];
+                let nearest = -1;
+                let nearestDistance = Infinity;
+
+                for (let i = 0; i < contours.length; i++) {
+                    if (!visited.has(i) && distances[last][i] < nearestDistance) {
+                        nearestDistance = distances[last][i];
+                        nearest = i;
+                    }
+                }
+
+                if (nearest !== -1) {
+                    path.push(nearest);
+                    visited.add(nearest);
+                }
+            }
+
+            return path;
+        }
+
+
+        function reorderContours(contours, path) {
+            const orderedContours = [];
+            console.log("Path:", path); // Debugging
+
+            for (let i = 0; i < path.length; i++) {
+                const contourIndex = path[i];
+                const contour = contours[contourIndex];
+
+                // Determine the direction to use the contour
+                if (i > 0) {
+                    const prevContour = orderedContours[orderedContours.length - 1];
+                    const prevPoint = prevContour[prevContour.length - 1];
+
+                    if (prevPoint && contour[0]) {
+                        const startToStart = Math.hypot(prevPoint.x - contour[0].x, prevPoint.y - contour[0].y);
+                        const startToEnd = Math.hypot(prevPoint.x - contour[contour.length - 1].x, prevPoint.y - contour[contour.length - 1].y);
+
+                        if (startToEnd < startToStart) {
+                            contour.reverse();
+                        }
+                        
+                    } else {
+                        console.error('Previous point or current contour start point is undefined.', { prevPoint, currentStart: contour[0] });
+                        continue; // Skip if any point is undefined
+                    }
+                }
+
+                orderedContours.push(contour);
+            }
+
+            return orderedContours;
+        }
+
+
+        function findClosestPoint(contours, point) {
+            let minDistance = Infinity;
+            let closestPoint = null;
 
             contours.forEach(contour => {
-                contour.forEach(point => {
-                    let distance = Math.sqrt(Math.pow(point.x - centroid.x, 2) + Math.pow(point.y - centroid.y, 2));
-                    if (distance > maxDistance) {
-                        maxDistance = distance;
-                        furthestContour = contour;
+                contour.forEach(pt => {
+                    const distance = Math.hypot(point.x - pt.x, point.y - pt.y);
+                    if (distance < minDistance) {
+                        minDistance = distance;
+                        closestPoint = pt;
+                    }
+                });
+            });
+            return closestPoint;
+        }
+
+        function createGraphFromContours(contours) {
+            const graph = [];
+
+            contours.forEach(contour => {
+                contour.forEach(pt => {
+                    let node = graph.find(n => n.x === pt.x && n.y === pt.y);
+                    if (!node) {
+                        node = { x: pt.x, y: pt.y, neighbors: [] };
+                        graph.push(node);
                     }
                 });
             });
 
-            return furthestContour;
+            contours.forEach(contour => {
+                for (let i = 0; i < contour.length; i++) {
+                    const node = graph.find(n => n.x === contour[i].x && n.y === contour[i].y);
+                    if (i > 0) {
+                        const prevNode = graph.find(n => n.x === contour[i - 1].x && n.y === contour[i - 1].y);
+                        if (!node.neighbors.includes(prevNode)) {
+                            node.neighbors.push(prevNode);
+                            prevNode.neighbors.push(node);
+                        }
+                    }
+                }
+            });
+
+            // Connect nodes from different contours within a small distance threshold
+            const threshold = 1;
+            graph.forEach(node => {
+                graph.forEach(otherNode => {
+                    if (node !== otherNode && !node.neighbors.includes(otherNode)) {
+                        const distance = Math.hypot(node.x - otherNode.x, node.y - otherNode.y);
+                        if (distance <= threshold) {
+                            node.neighbors.push(otherNode);
+                            otherNode.neighbors.push(node);
+                        }
+                    }
+                });
+            });
+
+            return graph;
         }
 
+        function addStartEndToGraph(graph, start, end) {
+            let startIdx = graph.findIndex(pt => pt.x === start.x && pt.y === start.y);
+            if (startIdx === -1) {
+                startIdx = graph.length;
+                graph.push({ x: start.x, y: start.y, neighbors: [] });
+            }
+
+            let endIdx = graph.findIndex(pt => pt.x === end.x && pt.y === end.y);
+            if (endIdx === -1) {
+                endIdx = graph.length;
+                graph.push({ x: end.x, y: end.y, neighbors: [] });
+            }
+
+            // Connect start point to nearest nodes as jumps
+            graph.forEach((node, idx) => {
+                if (idx !== startIdx) {
+                    const distanceToStart = Math.hypot(start.x - node.x, start.y - node.y);
+                    graph[startIdx].neighbors.push({ node, isJump: true, jumpDistance: distanceToStart });
+                    node.neighbors.push({ node: graph[startIdx], isJump: true, jumpDistance: distanceToStart });
+                }
+            });
+
+            // Connect end point to nearest nodes as jumps
+            graph.forEach((node, idx) => {
+                if (idx !== endIdx) {
+                    const distanceToEnd = Math.hypot(end.x - node.x, end.y - node.y);
+                    graph[endIdx].neighbors.push({ node, isJump: true, jumpDistance: distanceToEnd });
+                    node.neighbors.push({ node: graph[endIdx], isJump: true, jumpDistance: distanceToEnd });
+                }
+            });
+
+            return { startIdx, endIdx };
+        }
+
+
+        function dijkstraWithMinimalJumps(graph, startIdx, endIdx) {
+            const distances = Array(graph.length).fill(Infinity);
+            const previous = Array(graph.length).fill(null);
+            const totalJumpDistances = Array(graph.length).fill(Infinity);
+            const priorityQueue = new PriorityQueue();
+
+            distances[startIdx] = 0;
+            totalJumpDistances[startIdx] = 0;
+            priorityQueue.enqueue(0, startIdx);
+
+            while (!priorityQueue.isEmpty()) {
+                const { key: minDistanceNode } = priorityQueue.dequeue();
+
+                if (minDistanceNode === endIdx) break;
+
+                const currentNode = graph[minDistanceNode];
+                currentNode.neighbors.forEach(neighbor => {
+                    const neighborIdx = graph.findIndex(pt => pt.x === neighbor.node.x && pt.y === neighbor.node.y);
+                    const jumpDistance = neighbor.isJump ? neighbor.jumpDistance : 0;
+                    const alt = distances[minDistanceNode] + Math.hypot(currentNode.x - neighbor.node.x, currentNode.y - neighbor.node.y);
+                    const totalJumpDist = totalJumpDistances[minDistanceNode] + jumpDistance;
+
+                    if (totalJumpDist < totalJumpDistances[neighborIdx] || (totalJumpDist === totalJumpDistances[neighborIdx] && alt < distances[neighborIdx])) {
+                        distances[neighborIdx] = alt;
+                        previous[neighborIdx] = minDistanceNode;
+                        totalJumpDistances[neighborIdx] = totalJumpDist;
+                        priorityQueue.enqueue(totalJumpDist, neighborIdx);
+                    }
+                });
+
+            }
+
+            const path = [];
+            let u = endIdx;
+
+            while (u !== null) {
+                path.unshift({ x: graph[u].x, y: graph[u].y });
+                u = previous[u];
+            }
+
+            return path;
+        }
+
+        function checkContourClosure(contour) {
+            const firstPoint = { x: contour.intPtr(0)[0], y: contour.intPtr(0)[1] };
+            const lastPoint = { x: contour.intPtr(contour.rows - 1)[0], y: contour.intPtr(contour.rows - 1)[1] };
+            return firstPoint.x === lastPoint.x && firstPoint.y === lastPoint.y;
+        }
+
+        function closeContour(points) {
+            if (points.length > 1 && (points[0].x !== points[points.length - 1].x || points[0].y !== points[points.length - 1].y)) {
+                points.push({ x: points[0].x, y: points[0].y });
+            }
+            return points;
+        }
+
+        function adjustEpsilon(epsilon, pointsOver) {
+            if (pointsOver > 100) {
+                return epsilon + 1.0;
+            } else if (pointsOver <= 20) {
+                return epsilon + 0.1;
+            } else {
+                // Scale adjustment for points over the target between 20 and 100
+                let scale = (pointsOver - 20) / (100 - 20); // Normalized to range 0-1
+                return epsilon + 0.1 + 0.9 * scale;  // Adjust between 0.1 and 1.0
+            }
+        }
+
+        function getOrderedContours(edgeImage, initialEpsilon, retrievalMode, maxPoints) {
+            const contours = new cv.MatVector(), hierarchy = new cv.Mat();
+            cv.findContours(edgeImage, contours, hierarchy, retrievalMode, cv.CHAIN_APPROX_SIMPLE);
+            
+            const maxIterations = 100;  // Maximum iterations to avoid infinite loop
+
+            let contourPoints = [];
+            let totalPoints = 0;
+            let epsilon = initialEpsilon;
+            let iterations = 0;
+
+            do {
+                totalPoints = 0;
+                contourPoints = [];
+                
+                for (let i = 0; i < contours.size(); i++) {
+                    const contour = contours.get(i);
+                    const simplified = new cv.Mat();
+                    cv.approxPolyDP(contour, simplified, epsilon, true);
+
+                    let points = [];
+                    for (let j = 0; j < simplified.rows; j++) {
+                        const point = simplified.intPtr(j);
+                        points.push({ x: point[0], y: point[1] });
+                    }
+                    simplified.delete();
+
+                    if (points.length > 0) {  // Check for empty contours
+                        if (checkContourClosure(contour)) {
+                            points = closeContour(points);
+                        }
+                        contourPoints.push(points);
+                        totalPoints += points.length;
+                    }
+                }
+
+                if (totalPoints > maxPoints) {
+                    let pointsOver = totalPoints - maxPoints;
+                    epsilon = adjustEpsilon(epsilon, pointsOver);
+                    iterations++;
+                }
+            } while (totalPoints > maxPoints && iterations < maxIterations);
+
+            if (totalPoints > maxPoints && iterations >= maxIterations) {
+                let flattenedPoints = contourPoints.flat();
+                contourPoints = [flattenedPoints.slice(0, maxPoints)];  // Take the first N points
+            }
+
+            if (contourPoints.length === 0) {
+                console.error("No valid contours found.");
+                return [];
+            }
+
+
+            // Calculate distances and find the best path
+            const distances = calculateDistances(contourPoints);
+            const path = tspNearestNeighbor(distances, contourPoints);
+            const orderedContours = reorderContours(contourPoints, path);
+
+            return orderedContours;
+        }
+
+
+        
+
+        function getRandomColor() {
+            const letters = '0123456789ABCDEF';
+            let color = '#';
+            for (let i = 0; i < 6; i++) {
+                color += letters[Math.floor(Math.random() * 16)];
+            }
+            return color;
+        }
+
+
+
+        function resetCanvas(canvasId) {
+            const canvas = document.getElementById(canvasId);
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            // Reset transformation matrix
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
+        }
+
+        function traceContours(orderedContours, isLoop = false, minimizeJumps = true) {
+            let result = [];
+            let pathsUsed = [...orderedContours];
+           
+            for (let i = 0; i < orderedContours.length - (isLoop ? 0 : 1); i++) {
+                const currentContour = orderedContours[i];
+                
+                // If looping, add 1st contour again
+                const nextContour = orderedContours[(i + 1) % orderedContours.length];
+                const start = currentContour[currentContour.length - 1];  // End of the current contour
+                const end = nextContour[0];  // Start of the next contour
+
+                let path = [];
+                if (minimizeJumps){
+                    // Find path between contours
+                    path = findPathWithMinimalJumpDistances(pathsUsed, start, end);
+                }
+                
+                result.push(currentContour);
+                if (path.length > 0) {  // Add the path only if it has points
+                    result.push(path);
+                    pathsUsed.push(path);  // Add the used path to the list of paths
+                    //console.log('Added Path: ', i, JSON.stringify(path));
+                } else {
+                    //console.log('No Path Needed', i)
+                }
+            }
+
+            // Add the last contour as it doesn't need a connecting path and not looping
+            if (!isLoop) { result.push(orderedContours[orderedContours.length - 1]); }
+
+            return result;
+        }
+
+
+        function removeConsecutiveDuplicates(points) {
+            return points.filter((point, index) => {
+                if (index === 0) return true; // Keep the first point
+                const prevPoint = points[index - 1];
+                return !(point.x === prevPoint.x && point.y === prevPoint.y);
+            });
+        }
+
+
+        // Example usage
+        function findPathWithMinimalJumpDistances(contours, start, end) {
+            const graph = createGraphWithConnectionTypes(contours);
+            const { startIdx, endIdx } = addStartEndToGraph(graph, start, end, start, end);
+            const path = dijkstraWithMinimalJumps(graph, startIdx, endIdx);
+            return path;
+        }
+
+
+        function createGraphWithConnectionTypes(contours) {
+            const graph = [];
+
+            // Create nodes for each point in the contours
+            contours.forEach(contour => {
+                contour.forEach(pt => {
+                    let node = graph.find(n => n.x === pt.x && n.y === pt.y);
+                    if (!node) {
+                        node = { x: pt.x, y: pt.y, neighbors: [] };
+                        graph.push(node);
+                    }
+                });
+            });
+
+            // Connect points within the same contour (regular path connections)
+            contours.forEach(contour => {
+                for (let i = 0; i < contour.length; i++) {
+                    const node = graph.find(n => n.x === contour[i].x && n.y === contour[i].y);
+                    if (i > 0) {
+                        const prevNode = graph.find(n => n.x === contour[i - 1].x && n.y === contour[i - 1].y);
+                        if (!node.neighbors.some(neighbor => neighbor.node === prevNode)) {
+                            node.neighbors.push({ node: prevNode, isJump: false });
+                            prevNode.neighbors.push({ node: node, isJump: false });
+                        }
+                    }
+                };
+            });
+
+            // Connect nodes from different contours with jump connections
+            for (let i = 0; i < graph.length; i++) {
+                for (let j = i + 1; j < graph.length; j++) {
+                    const nodeA = graph[i];
+                    const nodeB = graph[j];
+                    const distance = Math.hypot(nodeA.x - nodeB.x, nodeA.y - nodeB.y);
+
+                    if (!nodeA.neighbors.some(neighbor => neighbor.node === nodeB)) {
+                        nodeA.neighbors.push({ node: nodeB, isJump: true, jumpDistance: distance });
+                    }
+                    if (!nodeB.neighbors.some(neighbor => neighbor.node === nodeA)) {
+                        nodeB.neighbors.push({ node: nodeA, isJump: true, jumpDistance: distance });
+                    }
+                }
+            }
+
+            return graph;
+        }
+
+        function generateDots(edgeImage) {
+            // Reset the canvas before drawing the new image
+            resetCanvas('dot-image');
+            resetCanvas('connect-image');
+
+            const epsilon = parseFloat(document.getElementById('epsilon-slider').value),
+                contourMode = document.getElementById('contour-mode').value,
+                isLoop = document.getElementById('is-loop').checked,
+                minimizeJumps = document.getElementById('no-shortcuts').checked,
+                singleByte = document.getElementById('single-byte').checked,
+                maxPoints = parseInt(document.getElementById('dot-number').value);
+                // useGaussianBlur = document.getElementById('gaussian-blur-toggle').checked,
+            const retrievalMode = (contourMode === 'cv.RETR_TREE') ? cv.RETR_TREE : cv.RETR_EXTERNAL;    
+            
+            orderedContours = getOrderedContours(edgeImage, epsilon, retrievalMode, maxPoints);
+
+            console.log('Ordered Contours: ', JSON.stringify(orderedContours));
+
+            const tracedContours = traceContours(orderedContours, isLoop, minimizeJumps);
+            console.log('Traced: ', JSON.stringify(tracedContours));
+
+            plotContours(tracedContours);
+            // Save for future plotting
+            orderedContoursSave = tracedContours;
+
+            let orderedPoints = tracedContours.flat();
+
+            if (isLoop) {
+                orderedPoints = reorderPointsForLoop(orderedPoints);
+            }
+
+            orderedPoints = removeConsecutiveDuplicates(orderedPoints);
+
+            const polarPoints = drawDots(orderedPoints);
+            WriteCoords(polarPoints, singleByte);
+            drawConnections(polarPoints);
+            document.getElementById('total-points').innerText = `(${orderedPoints.length} Points)`;
+        }
+
+        function WriteCoords(polarPoints, singleByte = false){
+            let formattedPoints = '';
+            if (!singleByte) {
+                formattedPolarPoints = polarPoints.map(p => `{${p.r.toFixed(0)},${p.theta.toFixed(0)}}`).join(',');
+            } else {
+                formattedPolarPoints = polarPoints.map(p => `{${Math.round(255 * p.r / 1000)},${Math.round(255 * p.theta / 3600)}}`).join(',');
+            }
+            
+            document.getElementById('polar-coordinates-textarea').value = formattedPolarPoints;
+        }
+
+        function reorderPointsForLoop(points) {
+            const centroid = calculateCentroid(points);
+            let minDist = Infinity;
+            let startIndex = 0;
+
+            // Find the point nearest to the centroid
+            points.forEach((point, index) => {
+                const dist = Math.hypot(point.x - centroid.x, point.y - centroid.y);
+                if (dist < minDist) {
+                    minDist = dist;
+                    startIndex = index;
+                }
+            });
+
+            // Reorder points to start from the point nearest to the centroid
+            return [...points.slice(startIndex), ...points.slice(0, startIndex)];
+        }
         
         function drawDots(points) {
             const canvas = document.getElementById('dot-image'), ctx = canvas.getContext('2d');
@@ -454,14 +852,68 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                 return { r: r * (1000 / Math.max(...points.map(p => Math.sqrt(p.x * p.x + p.y * p.y)))), theta: theta * 10 };
             });
 
-            const formattedPolarPoints = polarPoints.map(p => `{${p.r.toFixed(0)},${p.theta.toFixed(0)}}`).join(',');
-            document.getElementById('polar-coordinates-textarea').value = formattedPolarPoints;
-            //document.getElementById('polar-coordinates-container').style.display = 'block';
-
             return polarPoints; // Return polarPoints
         }
 
+        function plotContours(orderedContours) {
+            const canvas = document.getElementById('plotcontours');
+            const ctx = canvas.getContext('2d');
 
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            orderedContours.forEach((contour, index) => {
+                const baseColor = getRandomColor();
+                const [r, g, b] = hexToRgb(baseColor);
+                const length = contour.length;
+
+                contour.forEach((point, i) => {
+                    if (i === 0) {
+                        ctx.beginPath();
+                        ctx.moveTo(point.x, point.y);
+                    } else {
+                        ctx.lineTo(point.x, point.y);
+
+                        // Calculate color fade
+                        const ratio = i / length;
+                        const fadedColor = `rgb(${Math.round(r * (1 - ratio))}, ${Math.round(g * (1 - ratio))}, ${Math.round(b * (1 - ratio))})`;
+                        ctx.strokeStyle = fadedColor;
+                        ctx.lineWidth = 2;
+                        ctx.stroke();
+                        ctx.beginPath();
+                        ctx.moveTo(point.x, point.y);
+                    }
+                });
+
+                // Mark the start and end points
+                ctx.fillStyle = baseColor;
+                ctx.font = '12px Arial';
+
+                // Start point
+                ctx.fillText(`S${index + 1}`, contour[0].x, contour[0].y);
+                ctx.beginPath();
+                ctx.arc(contour[0].x, contour[0].y, 3, 0, 2 * Math.PI);
+                ctx.fill();
+
+                // End point
+                ctx.fillText(`E${index + 1}`, contour[contour.length - 1].x, contour[contour.length - 1].y);
+                ctx.beginPath();
+                ctx.arc(contour[contour.length - 1].x, contour[contour.length - 1].y, 3, 0, 2 * Math.PI);
+                ctx.fill();
+
+                // Label the contour with its number
+                const midPoint = contour[Math.floor(contour.length / 2)];
+                ctx.fillText(`${index + 1}`, midPoint.x, midPoint.y);
+            });
+        }
+
+        function hexToRgb(hex) {
+            const bigint = parseInt(hex.slice(1), 16);
+            return [
+                (bigint >> 16) & 255,
+                (bigint >> 8) & 255,
+                bigint & 255
+            ];
+        }
 
 
         function drawConnections(polarPoints) {
@@ -511,8 +963,6 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
         }
 
 
-
-
         function convertImage() {
             originalImageElement && processImage(originalImageElement);
         }
@@ -539,30 +989,46 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
                     <button id="generate-button">Generate Coordinates</button>
                 </div>
             </div>
-            <div class="grid-item advanced-settings">
-                <h3>Advanced Settings</h3>
+            <div class="grid-item">
                 <div class="settings-grid">
-                    <div class="hidden">
-                        <label for="gaussian-blur-toggle">Gaussian blur</label>
-                        <input type="checkbox" id="gaussian-blur-toggle" name="gaussian-blur-toggle">
-                    </div>
                     <div class="slider-container">
-                        <input type="range" id="epsilon-slider" min="0.1" max="10" step="0.1" value="3" style="width: 100%;">
+                        <input type="range" id="epsilon-slider" min="0.1" max="20" step="0.1" value="3" style="width: 100%;" title="Adjust the granularity with which the shapes are drawn - fine means more points and could be slower to compute">
                         <span id="epsilon-value-display">3</span>
                         <div class="slider-labels">
                             <small>Fine</small>
                             <small>Coarse</small>
                         </div>
                     </div>
-                    <div>
-                        <label for="contour-mode">Contour Mode</label>
+                    <div class="checkbox-container">
+                        <label for="is-loop" title="Smoothly Connect the last and first points in the drawing output so the marble can draw continuously. There's a good chance it will do this anyway, but checking this box allows the marble to start from a different position, but may add more points. It also may retrace the steps if used with No shortcuts.">Loop Drawing</label>
+                        <input type="checkbox" id="is-loop" name="is-loop">
+                    </div>
+                    <div class="dropdown-container">
+                        <label for="contour-mode" title="Just draw the outer contour or try finding all interior contours too. For complex shapes this might take a long time and use a lot of points">Contour Mode</label>
                         <select id="contour-mode">
                             <option value="cv.RETR_EXTERNAL">External</option>
                             <option value="cv.RETR_TREE">Tree (experimental)</option>
                         </select>
                     </div>
+                    <div class="checkbox-container">
+                        <label for="no-shortcuts" title="Discourage shortcuts between contours - Draws cleaner image but takes more points.">No Shortcuts (experimental)</label>
+                        <input type="checkbox" id="no-shortcuts" name="no-shortcuts">
+                    </div>
+                    <div class="dropdown-container">
+                        <label for="dot-number" title="Limit the number of points per contour. It will make the contours less granular to achieve this, or truncate the image if too many points are needed. Too high a limit can cause the computation to take a long time.">Contour Point Limit</label>
+                        <select id="dot-number">
+                            <option value="100">100</option>
+                            <option value="200">200</option>
+                            <option value="500">500 (experimental)</option>
+                            <option value="1000">1000 (experimental)</option>
+                        </select>
+                    </div>
+                    <div class="checkbox-container">
+                        <label for="single-byte" title="Outputs coordinates scaled so the r and theta are between 0 and 255. This is useful if you want more points in less memory, but needs a code change on the Arduino code too.">Single-Byte Coordinates (experimental)</label>
+                        <input type="checkbox" id="single-byte" name="single-byte">
+                    </div>
                 </div>
-            </div>            
+            </div>
             <div class="grid-item">
                 <h4>Original Image</h4>
                 <canvas id="original-image"></canvas>
@@ -579,10 +1045,15 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
                 <h4>Sand Garden Image</h4>
                 <canvas id="connect-image"></canvas>
             </div>
-
+            <div class="hidden">
+                <h4>contours</h4>
+                <canvas id="plotcontours" width="400" height="400" style="border:1px solid #000000;"></canvas>
+                <button id="plotButton">Plot Next Contour</button>
+            </div>
+            
             <div class="grid-item span-full-width">
                 <h4>Polar Coordinates to Trace Image <span id="total-points"></span></h4>
-                <textarea id="polar-coordinates-textarea"></textarea>
+                <textarea id="polar-coordinates-textarea" title="Coordinates of the points that make up the image in (r, theta). r is scaled from 0-1000 and theta is in tengths of a degree (unless you checked single-byte coordinates)"></textarea>
             </div>
 
             <div class="grid-item span-full-width">
