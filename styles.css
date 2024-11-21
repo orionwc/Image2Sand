@@ -93,12 +93,16 @@ canvas {
 
 .settings-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px 10px; /* Add vertical space between grid items */
+    grid-template-columns: 1fr 1fr;  /* Two columns */
+    gap: 20px;  /* Space between items */
 }
 
-.advanced-settings label, .settings-grid div {
-    font-size: 12px; /* Smaller text size for labels */
+.slider-container, .dropdown-container {
+    grid-column: 1;  /* Left column */
+}
+
+.checkbox-container {
+    grid-column: 2;  /* Right column */
 }
 
 .slider-container {
@@ -114,6 +118,19 @@ canvas {
     width: 100%;
     margin-top: -10px; /* Adjust top margin to bring it closer to the slider */
     text-align: center;
+}
+
+.dropdown-container {
+    margin-bottom: 20px;
+}
+
+.checkbox-container {
+    display: flex;
+    align-items: center;
+}
+
+.advanced-settings label, .settings-grid div {
+    font-size: 12px; /* Smaller text size for labels */
 }
 
 #total-points {
