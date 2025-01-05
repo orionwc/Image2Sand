@@ -25,6 +25,81 @@ class PriorityQueue {
 let currentContourIndex = 0;
 let isFirstClick = true;
 let originalImageElement = null;
+let isGeneratingImage = false;
+let isGeneratingCoords = false;
+
+function drawAndProcessImage(imgElement) {
+    const canvas = document.getElementById('original-image');
+    const ctx = canvas.getContext('2d');
+    canvas.width = imgElement.naturalWidth;
+    canvas.height = imgElement.naturalHeight;
+    ctx.drawImage(imgElement, 0, 0);
+
+    // Set originalImageElement to the current image
+    originalImageElement = imgElement;
+
+    // Process the image after drawing it on the canvas
+    processImage(originalImageElement);
+
+    // Ensure grid height does not exceed 70% of the viewport height
+    const gridHeight = document.querySelector('.grid').clientHeight;
+    const viewportHeight = window.innerHeight * 0.7;
+    if (gridHeight > viewportHeight) {
+        document.querySelector('.grid').style.height = `${viewportHeight}px`;
+    }
+}
+
+
+async function generateImage(apiKey, prompt) {
+    if (isGeneratingImage) {
+        document.getElementById('generation-status').textContent = "Image is still generating - please don't press the button."; 
+    } else {
+        isGeneratingImage = true;
+        document.getElementById('gen-image-button').disabled = true;
+        document.getElementById('generation-status').style.display = 'block';
+        try {
+
+            const fullPrompt = `Draw an image of the following: ${prompt}. But make it a simple black silhouette on a white background, with minimal details, like a coloring book for a 5-year-old where the image is already colored black.`;
+
+            const response = await fetch('https://api.openai.com/v1/images/generations', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${apiKey}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    model: 'dall-e-2',
+                    prompt: fullPrompt,
+                    size: '256x256',
+                    quality: 'standard',
+                    response_format: 'b64_json', // Specify base64 encoding
+                    n: 1
+                })
+            });
+
+            const data = await response.json();
+            //const imageUrl = data.data[0].url;
+            const imageData = data.data[0].b64_json;
+
+            console.log("Image Data: ", imageData);
+
+            const imgElement = new Image();
+            imgElement.onload = function() {
+                drawAndProcessImage(imgElement);
+            };
+            imgElement.src = `data:image/png;base64,${imageData}`;
+
+            console.log(`Image generated successfully`);
+        } catch (error) {
+            console.error('Error:', error);
+        }
+        isGeneratingImage = false;
+        document.getElementById('generation-status').style.display = 'none';
+        document.getElementById('generation-status').textContent = "Image is generating - please wait...";
+        document.getElementById('gen-image-button').disabled = false;
+    }
+
+}
 
 
 function handleImageUpload(event) {
@@ -36,22 +111,7 @@ function handleImageUpload(event) {
             originalImageElement = new Image();
             originalImageElement.id = 'uploaded-image';
             originalImageElement.onload = () => {
-                // Draw the original image on the original-image canvas
-                const canvas = document.getElementById('original-image');
-                const ctx = canvas.getContext('2d');
-                canvas.width = originalImageElement.naturalWidth;
-                canvas.height = originalImageElement.naturalHeight;
-                ctx.drawImage(originalImageElement, 0, 0, canvas.width, canvas.height);
-
-                // Process the image after drawing it on the canvas
-                processImage(originalImageElement);
-
-                // Ensure grid height does not exceed 70% of the viewport height
-                const gridHeight = document.querySelector('.grid').clientHeight;
-                const viewportHeight = window.innerHeight * 0.7;
-                if (gridHeight > viewportHeight) {
-                    document.querySelector('.grid').style.height = `${viewportHeight}px`;
-                }
+                drawAndProcessImage(originalImageElement);
             };
             document.getElementById('original-image').appendChild(originalImageElement);
         }
@@ -63,22 +123,33 @@ function handleImageUpload(event) {
 
 
 function processImage(imgElement) {
-    const src = cv.imread(imgElement), dst = new cv.Mat();
-    cv.cvtColor(src, src, cv.COLOR_RGBA2GRAY, 0);
-    cv.Canny(src, dst, 50, 150, 3, false);
+    document.getElementById('processing-status').style.display = 'block';
+    document.getElementById('generate-button').disabled = true;
 
-    // Add morphological operations
-    const kernel = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(3, 3));
-    cv.dilate(dst, dst, kernel);
-    cv.erode(dst, dst, kernel);
-    // Invert the colors of the detected edges image
-    cv.bitwise_not(dst, dst);
+    // Use setTimeout to allow the UI to update
+    setTimeout(() => {
+        const src = cv.imread(imgElement), dst = new cv.Mat();
+        cv.cvtColor(src, src, cv.COLOR_RGBA2GRAY, 0);
+        cv.Canny(src, dst, 50, 150, 3, false);
 
-    cv.imshow('edge-image', dst);
-    cv.bitwise_not(dst, dst);
-    generateDots(dst);
-    src.delete(); dst.delete();
+        // Add morphological operations
+        const kernel = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(3, 3));
+        cv.dilate(dst, dst, kernel);
+        cv.erode(dst, dst, kernel);
+        // Invert the colors of the detected edges image
+        cv.bitwise_not(dst, dst);
+
+        cv.imshow('edge-image', dst);
+        cv.bitwise_not(dst, dst);
+        generateDots(dst);
+        src.delete(); dst.delete();
+
+        // Hide the processing status label
+        document.getElementById('processing-status').style.display = 'none';
+        document.getElementById('generate-button').disabled = false;
+    }, 0); // Set delay to 0 to allow the UI to update
 }
+
 
 
 function adjustEpsilon(epsilon, pointsOver) {
@@ -652,7 +723,7 @@ function generateDots(edgeImage) {
         singleByte = document.getElementById('single-byte').checked,
         maxPoints = parseInt(document.getElementById('dot-number').value);
         // useGaussianBlur = document.getElementById('gaussian-blur-toggle').checked,
-    const retrievalMode = (contourMode === 'cv.RETR_TREE') ? cv.RETR_TREE : cv.RETR_EXTERNAL;    
+    const retrievalMode = (contourMode == 'External') ?  cv.RETR_EXTERNAL : cv.RETR_TREE;    
     
     orderedContours = getOrderedContours(edgeImage, epsilon, retrievalMode, maxPoints);
 
@@ -689,6 +760,8 @@ function WriteCoords(polarPoints, singleByte = false){
     }
     
     document.getElementById('polar-coordinates-textarea').value = formattedPolarPoints;
+    document.getElementById('simple-coords').textContent = formattedPolarPoints;
+    document.getElementById('simple-coords-title').style = 'visibility: hidden';
 }
 
 
@@ -864,6 +937,42 @@ function convertImage() {
 }
 
 
+// Function to get URL parameters
+function getUrlParams() {
+    const params = new URLSearchParams(window.location.search);
+    return {
+        apikey: params.get('apikey'),
+        prompt: params.get('prompt'),
+        run: params.get('run')
+    };
+}
+
+
+// Function to fill inputs from URL parameters
+function fillInputsFromParams(params) {
+    if (params.apikey) {
+        document.getElementById('api-key').value = params.apikey;
+    }
+    if (params.prompt) {
+        document.getElementById('prompt').value = params.prompt;
+    }
+}
+
+
+function setDefaultsForAutoGenerate() {
+    document.getElementById('epsilon-slider').value = 1;
+    document.getElementById('dot-number').value = 200;
+    document.getElementById('no-shortcuts').value = true;
+    document.getElementById('contour-mode').value = 'Tree';
+    hiddenResponse();
+}
+
+function hiddenResponse() {
+    document.getElementById('master-container').style = 'display: none;';
+    document.getElementById('simple-container').style = 'visibility: visible';
+}
+
+
 document.addEventListener('DOMContentLoaded', function() {
     const fileInput = document.getElementById('file-input');
     const fileButton = document.getElementById('file-button');
@@ -896,4 +1005,34 @@ document.addEventListener('DOMContentLoaded', function() {
         // convertImage(); // Automatically run convertImage on change
     });
 
+    window.showTab = function(tabName) {
+        const tabContents = document.querySelectorAll('.tab-content');
+        tabContents.forEach(content => { content.style.display = 'none'; });
+        document.getElementById(tabName).style.display = 'block'; 
+    };
+
+});
+
+
+// Initialize the page with URL parameters if present
+document.addEventListener('DOMContentLoaded', (event) => {
+    const { apikey, prompt, run } = getUrlParams();
+
+    // Fill inputs with URL parameters if they exist
+    fillInputsFromParams({ apikey, prompt });
+
+    // Generate image if all parameters are present
+    if (apikey && prompt && run) {
+        setDefaultsForAutoGenerate();
+        generateImage(apikey, prompt);
+    }
+
+    // Add event listener to the button inside the DOMContentLoaded event
+    document.getElementById('gen-image-button').addEventListener('click', () => {
+        let apiKey = document.getElementById('api-key').value;
+        const prompt = document.getElementById('prompt').value;
+        generateImage(apiKey, prompt);
+
+    });
+    
 });
