@@ -268,6 +268,13 @@ body {
     margin-left: 10px; /* Add space between the text box and the button */
 }
 
+.checkbox-container {
+    display: flex;
+    align-items: center;
+    margin-left: 10px; /* Add space between the button and the checkbox */
+}
+
+
 #api-key-group {
     width: 100%; /* Match the width of the combined width of the prompt input and button */
 }

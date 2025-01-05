@@ -1030,7 +1030,7 @@ document.addEventListener('DOMContentLoaded', (event) => {
     // Add event listener to the button inside the DOMContentLoaded event
     document.getElementById('gen-image-button').addEventListener('click', () => {
         let apiKey = document.getElementById('api-key').value;
-        const prompt = document.getElementById('prompt').value;
+        const prompt = document.getElementById('prompt').value + (document.getElementById('googly-eyes').checked ? ' with disproportionately large googly eyes' : '');
         generateImage(apiKey, prompt);
 
     });
