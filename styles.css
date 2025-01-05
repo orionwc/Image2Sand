@@ -39,6 +39,50 @@ body {
     }
 }
 
+.tab {
+    display: inline-flex;
+    align-items: center;
+    cursor: pointer;
+    padding: 5px; /* Reduced padding */
+    border: 1px solid #ccc;
+    background-color: #f1f1f1;
+    color: #000;
+    transition: background-color 0.3s ease;
+}
+
+.tab:hover {
+    background-color: #e0e0e0;
+}
+
+input[type="radio"] {
+    display: inline-block; /* Ensure radio button is visible */
+    margin-right: 5px;
+}
+
+input[type="radio"]:checked + label {
+    background-color: transparent; /* Remove blue background */
+    color: #000; /* Change text color to default */
+    font-weight: bold; /* Make the active tab text bold */
+}
+
+input[type="radio"] + label:hover {
+    background-color: #e0e0e0;
+}
+
+.tab-content {
+    display: none;
+}
+
+#frame {
+    border: 1px solid #ccc;
+    padding: 20px;
+    margin-top: 10px;
+    background-color: #fff;
+    min-height: 100px; /* Reduced minimum height */
+    width: 100%; /* Ensure width remains consistent */
+    box-sizing: border-box; /* Include padding and border in the element's total width and height */
+}
+
 .page-title {
     font-family: 'Verdana', sans-serif; /* Changed to a wider and more rounded font */
     font-size: 2em;
@@ -199,4 +243,35 @@ body {
 .grid {
     grid-template-columns: repeat(2, minmax(300px, 1fr));
     justify-content: center; /* Center the grid */
+}
+
+/* Add these styles to your styles.css file */
+
+.input-group {
+    display: flex;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.input-group {
+    display: flex;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+#prompt {
+    width: calc(1ch * 20); /* Set the width to fit 20 characters */
+    margin-right: 10px; /* Add space between the text box and the button */
+}
+
+#gen-image-button {
+    margin-left: 10px; /* Add space between the text box and the button */
+}
+
+#api-key-group {
+    width: 100%; /* Match the width of the combined width of the prompt input and button */
+}
+
+#api-key {
+    width: calc(100% - 150px); /* Adjust width to match the combined width of prompt label, input, and button */
 }

@@ -29,21 +29,22 @@ SOFTWARE.
     <title>Image 2 Sand</title>
     
     <!-- Google Tag Manager -->
-    <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
-    new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
-    j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
-    'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
-    })(window,document,'script','dataLayer','GTM-T2SCV6C5');</script>    
-        <!-- End Google Tag Manager -->
+    <script>
+        (function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+        new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+        j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+        'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+        })(window,document,'script','dataLayer','GTM-T2SCV6C5');
+    </script>    
+    <!-- End Google Tag Manager -->
 
     <!-- Google tag (gtag.js) -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-95DKPP01QS"></script>
     <script>
-    window.dataLayer = window.dataLayer || [];
-    function gtag(){dataLayer.push(arguments);}
-    gtag('js', new Date());
-
-    gtag('config', 'G-95DKPP01QS');
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-95DKPP01QS');
     </script>
     
     <link rel="stylesheet" href="styles.css">
@@ -59,50 +60,79 @@ SOFTWARE.
     height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
     <!-- End Google Tag Manager (noscript) -->
 
-    <div class="container">
+    <div class="container" id="master-container">
         <div class="grid">
             <div class="grid-item span-full-width">
                 <h1 class="page-title">Image 2 Sand</h1>
                 <p><small>To learn more about what this site is for, watch <a href="https://youtu.be/fOfYCiM7BC8">this video</a>.</small></p>
             </div>
             <div class="grid-item">
-                <div class="file-input-group">
-                    <input type="file" id="file-input" style="display: none;" accept="image/*">
-                    <button id="file-button"><img src="open-file-icon.png" alt="Open File" style="width: 20px; height: 20px;"></button>
-                    <span id="file-name">No file selected</span>
-                    <button id="generate-button">Generate Coordinates</button>
+                <div>
+                    <input type="radio" id="uploadTab" name="tab" checked onchange="showTab('upload')">
+                    <label for="uploadTab" class="tab">Upload an Image</label>
+                    <input type="radio" id="generateTab" name="tab" onchange="showTab('generate')">
+                    <label for="generateTab" class="tab">Generate an Image</label>
+                </div>
+            
+                <div id="frame">
+                    <div id="upload" class="tab-content" style="display: block;">
+                        <div class="file-input-group">
+                            <input type="file" id="file-input" style="display: none;" accept="image/*">
+                            <button id="file-button"><img src="open-file-icon.png" alt="Open File" style="width: 20px; height: 20px;"></button>
+                            <span id="file-name">No file selected</span>
+                        </div>
+                    </div>
+            
+                    <div id="generate" class="tab-content" style="display: none;">
+                        <div class="input-group" id="api-key-group">
+                            <label for="api-key">OpenAI API Key:</label>
+                            <input type="text" id="api-key" placeholder="Enter a valid OpenAI API key">
+                        </div>
+                        <div class="input-group">
+                            <label for="prompt">Image Prompt:</label>
+                            <input type="text" id="prompt" placeholder="What do you want to draw?" maxlength="20">
+                            <button id="gen-image-button">Create</button>
+                        </div>
+                        <label id="generation-status" style="display: none;">Image is generating - please wait...</label>
+                    </div>
+                                      
+                </div>
+                <div><button id="generate-button">Generate Coordinates</button>
+                <label id="processing-status" style="display: none;">Image is processing - please wait...</label>
                 </div>
             </div>
             <div class="grid-item">
                 <div class="settings-grid">
                     <div class="slider-container">
-                        <input type="range" id="epsilon-slider" min="0.1" max="20" step="0.1" value="3" style="width: 100%;" title="Adjust the granularity with which the shapes are drawn - fine means more points and could be slower to compute">
-                        <span id="epsilon-value-display">3</span>
+                        <input type="range" id="epsilon-slider" min="0.1" max="20" step="0.1" value="2" style="width: 100%;" title="Adjust the granularity with which the shapes are drawn - Fine (smaller) means more points and could be much slower to compute">
+                        <span id="epsilon-value-display">2</span>
                         <div class="slider-labels">
                             <small>Fine</small>
                             <small>Coarse</small>
                         </div>
                     </div>
                     <div class="checkbox-container">
-                        <label for="is-loop" title="Smoothly Connect the last and first points in the drawing output so the marble can draw continuously. There's a good chance it will do this anyway, but checking this box allows the marble to start from a different position, but may add more points. It also may retrace the steps if used with No shortcuts.">Loop Drawing</label>
+                        <label for="is-loop" title="Smoothly connect the last and first points in the drawing output so the marble can draw continuously. It may do this anyway, but checking this box allows the marble to start from a position closer to the center, and may add more points. It also may retrace the steps if used with No shortcuts.">Loop Drawing</label>
                         <input type="checkbox" id="is-loop" name="is-loop">
                     </div>
                     <div class="dropdown-container">
-                        <label for="contour-mode" title="Just draw the outer contour or try finding all interior contours too. For complex shapes this might take a long time and use a lot of points">Contour Mode</label>
+                        <label for="contour-mode" title="Just draw the outer contour or try finding all interior contours too. For complex shapes this can take a very long time and result in a lot of points">Contour Mode</label>
                         <select id="contour-mode">
-                            <option value="cv.RETR_EXTERNAL">External</option>
-                            <option value="cv.RETR_TREE">Tree (experimental)</option>
+                            <option value="External">External</option>
+                            <option value="Tree" selected>External + Internal</option>
                         </select>
                     </div>
                     <div class="checkbox-container">
-                        <label for="no-shortcuts" title="Discourage shortcuts between contours - Draws cleaner image but takes more points.">No Shortcuts (experimental)</label>
+                        <label for="no-shortcuts" title="Discourage shortcuts between contours - Draws cleaner image but takes more points and more time to generate.">No Shortcuts (experimental)</label>
                         <input type="checkbox" id="no-shortcuts" name="no-shortcuts">
                     </div>
                     <div class="dropdown-container">
                         <label for="dot-number" title="Limit the number of points per contour. It will make the contours less granular to achieve this, or truncate the image if too many points are needed. Too high a limit can cause the computation to take a long time.">Contour Point Limit</label>
                         <select id="dot-number">
                             <option value="100">100</option>
-                            <option value="200">200</option>
+                            <option value="200" selected>200</option>
+                            <option value="300">300</option>
+                            <option value="500">400 (experimental)</option>
                             <option value="500">500 (experimental)</option>
                             <option value="1000">1000 (experimental)</option>
                         </select>
@@ -137,7 +167,7 @@ SOFTWARE.
             
             <div class="grid-item span-full-width">
                 <h4>Polar Coordinates to Trace Image <span id="total-points"></span></h4>
-                <textarea id="polar-coordinates-textarea" title="Coordinates of the points that make up the image in (r, theta). r is scaled from 0-1000 and theta is in tengths of a degree (unless you checked single-byte coordinates)"></textarea>
+                <textarea readonly id="polar-coordinates-textarea" title="Coordinates of the points that make up the image in (r, theta). r is scaled from 0-1000 and theta is in tengths of a degree (unless you checked single-byte coordinates)"></textarea>
             </div>
 
             <div class="grid-item span-full-width">
@@ -145,6 +175,10 @@ SOFTWARE.
                 <p><small>Web Page by ORION - Youtube: <a href="https://www.youtube.com/@InspiredByOrion">InspiredByOrion</a></small></p>
             </div>
         </div>
+    </div>
+    <div id="simple-container" style="visibility: hidden;">
+        <label id="simple-coords-title">Calculating...</label>
+        <label id="simple-coords"></label>
     </div>
 
 </body>
