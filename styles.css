@@ -7,10 +7,36 @@ body {
 }
 
 .container {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-around;
     width: 90%;
     max-width: 1200px;
     margin: 0 auto;
     text-align: center;
+}
+
+.canvas-container {
+    margin: 10px;
+    flex: 1 0 calc(25% - 20px);
+}
+
+.canvas-container img, .canvas-container canvas {
+    max-width: 100%;
+    height: auto;
+    display: block;
+}
+
+@media (max-width: 1200px) {
+    .canvas-container {
+        flex: 1 0 calc(50% - 20px);
+    }
+}
+
+@media (max-width: 600px) {
+    .canvas-container {
+        flex: 1 0 100%;
+    }
 }
 
 .page-title {
