@@ -68,9 +68,9 @@ async function generateImage(apiKey, prompt) {
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                    model: 'dall-e-2',
+                    model: 'dall-e-3',
                     prompt: fullPrompt,
-                    size: '256x256',
+                    size: '1024x1024',
                     quality: 'standard',
                     response_format: 'b64_json', // Specify base64 encoding
                     n: 1
