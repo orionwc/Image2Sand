@@ -59,7 +59,7 @@ async function generateImage(apiKey, prompt) {
         document.getElementById('generation-status').style.display = 'block';
         try {
 
-            const fullPrompt = `Draw an image of the following: ${prompt}. But make it a simple black silhouette on a white background, with minimal details, like a coloring book for a 5-year-old where the image is already colored black.`;
+            const fullPrompt = `Draw an image of the following: ${prompt}. But make it a simple black silhouette on a white background, with very minimal detail and no additional content in the image, so I can use it for a computer icon.`;
 
             const response = await fetch('https://api.openai.com/v1/images/generations', {
                 method: 'POST',
@@ -79,6 +79,9 @@ async function generateImage(apiKey, prompt) {
 
             const data = await response.json();
             //const imageUrl = data.data[0].url;
+            if ('error' in data) {
+                throw new Error(data.error.message);
+            }
             const imageData = data.data[0].b64_json;
 
             console.log("Image Data: ", imageData);
@@ -91,7 +94,7 @@ async function generateImage(apiKey, prompt) {
 
             console.log(`Image generated successfully`);
         } catch (error) {
-            console.error('Error:', error);
+            console.error('Image generation error:', error);
         }
         isGeneratingImage = false;
         document.getElementById('generation-status').style.display = 'none';
@@ -961,7 +964,7 @@ function fillInputsFromParams(params) {
 
 function setDefaultsForAutoGenerate() {
     document.getElementById('epsilon-slider').value = 1;
-    document.getElementById('dot-number').value = 200;
+    document.getElementById('dot-number').value = 300;
     document.getElementById('no-shortcuts').value = true;
     document.getElementById('contour-mode').value = 'Tree';
     hiddenResponse();
@@ -1032,7 +1035,6 @@ document.addEventListener('DOMContentLoaded', (event) => {
         let apiKey = document.getElementById('api-key').value;
         const prompt = document.getElementById('prompt').value + (document.getElementById('googly-eyes').checked ? ' with disproportionately large googly eyes' : '');
         generateImage(apiKey, prompt);
-
     });
     
 });
