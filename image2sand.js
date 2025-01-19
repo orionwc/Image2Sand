@@ -1034,12 +1034,6 @@ document.addEventListener('DOMContentLoaded', (event) => {
     document.getElementById('gen-image-button').addEventListener('click', () => {
         let apiKey = document.getElementById('api-key').value;
         const prompt = document.getElementById('prompt').value + (document.getElementById('googly-eyes').checked ? ' with disproportionately large googly eyes' : '');
-
-        if (apiKey == '') {
-            // Use demo API key with restricted credit until depleted:
-            apiKey = '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';
-        }
-        
         generateImage(apiKey, prompt);
     });
     
