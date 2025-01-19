@@ -159,6 +159,8 @@ Positions pattern_PentagonRainbow(Positions current, bool restartPattern = false
 Positions pattern_RandomWalk1(Positions current, bool restartPattern = false);                //Random walk 1 (connected by arcs)
 Positions pattern_RandomWalk2(Positions current, bool restartPattern = false);                //Random walk 2 (connected by lines)
 Positions pattern_AccidentalButterfly(Positions current, bool restartPattern = false);        //Accidental Butterfly
+Positions pattern_Remote(Positions current, bool restartPattern = false);                     //Remote Coordinates
+
 
 /**
  * @brief Typedef for storing pointers to pattern-generating functions.
@@ -189,7 +191,7 @@ typedef Positions (*PatternFunction)(Positions, bool);
  * but keep it in mind when working with the array.
  */
 PatternFunction patterns[] = {pattern_SimpleSpiral, pattern_Cardioids, pattern_WavySpiral, pattern_RotatingSquares, pattern_PentagonSpiral, pattern_HexagonVortex, pattern_PentagonRainbow, pattern_RandomWalk1,
-                              pattern_RandomWalk2, pattern_AccidentalButterfly};
+                              pattern_RandomWalk2, pattern_AccidentalButterfly, pattern_Remote};
 
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -423,6 +425,8 @@ SETUP FUNCTION (runs once when Arduino powers on)
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void setup() {
+  Serial.begin(9600);   // Required to allow serial communication for Pattern_Remote
+
   //Generate a random seed. If you want to use pseudorandom numbers in a pattern, this makes them more random.
   //Make sure that RANDOM_SEED_PIN is an analog pin that's not connected to anything.
   randomSeed(analogRead(RANDOM_SEED_PIN));
@@ -1929,6 +1933,118 @@ Positions pattern_AccidentalButterfly(Positions current, bool restartPattern = f
 }
 
 
+const byte numCharsSerialBuffer = 32;
+char receivedString[numCharsSerialBuffer];
+
+char* receivedWithStartEndMarkers() {
+    static boolean recvInProgress = false;
+    static bool newData = false;
+    static byte ndx = 0;
+
+    char startMarker = '<';
+    char endMarker = '>';
+    char rc;
+    newData = false;
+    while (Serial.available() > 0 && newData == false) {
+        rc = Serial.read();
+        if (recvInProgress == true) {
+            if (rc != endMarker) {
+                receivedString[ndx] = rc;
+                ndx++;
+                if (ndx >= numCharsSerialBuffer) {
+                    ndx = numCharsSerialBuffer - 1;
+                }
+            }
+            else {
+                receivedString[ndx] = '\0';
+                recvInProgress = false;
+                ndx = 0;
+                newData = true;
+            }
+        }
+        else if (rc == startMarker) {
+            recvInProgress = true;       
+        }
+    }
+
+    if (newData) {
+      return receivedString;
+    } else {
+      return nullptr;
+    }
+}
+
+void waitUntilReceived(String s) {
+  while (s.compareTo(String(receivedString))!=0) {
+    char* receivedString = receivedWithStartEndMarkers();
+  }
+}
+
+
+/**
+ * HACK BY ORION (AKA: Magicaldroid)
+ *
+ * @brief Pattern: Receive points to move from remote connection via Serial port.
+ * Generates the next target position based on the information received via Serial port.
+ * Expecting coordinates to be sent as <POS:r,theta> where r, theta are polar coordinates.
+ * r is a number from 0-1000 (1000 is max distance) and theta is the angle in tenths of a degree (0 to 3600)
+ *
+ * @param current The current position of the gantry, represented as a Positions struct.
+ * @param restartPattern A flag that allows restarting the pattern. Defaults to false.
+ * 
+ * @return Positions The next target position for the motion controller, represented as a Positions struct.
+ * 
+ */
+Positions pattern_Remote(Positions current, bool restartPattern = false) {
+
+  static bool starting = true, isMoving = false; 
+  static Positions startPos = current;
+  static Positions endPos = {0,0};
+
+  Positions target;
+
+  if (starting) {
+    Serial.println("COORDS");
+    waitUntilReceived("START");
+    Serial.println("READY");
+  }
+
+  if (!isMoving){
+    int r = 0, theta = 0;
+    bool done = false;
+    while (!done){
+      char* receivedString = receivedWithStartEndMarkers();
+      if (receivedString != nullptr) {
+        Serial.println(receivedString);
+
+        // Check if receivedString contains "POS:"
+        if (strncmp(receivedString, "POS:", 4) == 0) {
+            sscanf(receivedString + 4, "%d,%d", &r, &theta);
+            endPos = {r, theta};
+            done = true;
+            isMoving = true;
+        }
+      }
+    }
+  }
+
+  Positions startPoint = { (int)(startPos.radial * (float)MAX_R_STEPS/1000), (int)convertDegreesToSteps((float)(startPos.angular)/10) };
+  Positions endPoint = { (int)(endPos.radial * (float)MAX_R_STEPS/1000), (int)convertDegreesToSteps((float)(endPos.angular)/10) };
+  if (!starting) {
+    target = drawLine(startPoint, endPoint, current, 100);
+  }
+
+  if ((starting) || ((target.angular == endPoint.angular) && (target.radial == endPoint.radial))) {
+    // Get Next Position
+    Serial.println("DONE");
+    isMoving = false;
+    startPos = endPos;
+    starting = false;
+  }
+
+  return target;
+
+}
 
 
 #pragma endregion Patterns
