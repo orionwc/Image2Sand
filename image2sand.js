@@ -28,7 +28,7 @@ let originalImageElement = null;
 let isGeneratingImage = false;
 let isGeneratingCoords = false;
 
-function drawAndProcessImage(imgElement) {
+function drawAndPrepImage(imgElement) {
     const canvas = document.getElementById('original-image');
     const ctx = canvas.getContext('2d');
     canvas.width = imgElement.naturalWidth;
@@ -37,20 +37,10 @@ function drawAndProcessImage(imgElement) {
 
     // Set originalImageElement to the current image
     originalImageElement = imgElement;
-
-    // Process the image after drawing it on the canvas
-    processImage(originalImageElement);
-
-    // Ensure grid height does not exceed 70% of the viewport height
-    const gridHeight = document.querySelector('.grid').clientHeight;
-    const viewportHeight = window.innerHeight * 0.7;
-    if (gridHeight > viewportHeight) {
-        document.querySelector('.grid').style.height = `${viewportHeight}px`;
-    }
 }
 
 
-async function generateImage(apiKey, prompt) {
+async function generateImage(apiKey, prompt, autoprocess) {
     if (isGeneratingImage) {
         document.getElementById('generation-status').textContent = "Image is still generating - please don't press the button."; 
     } else {
@@ -88,7 +78,10 @@ async function generateImage(apiKey, prompt) {
 
             const imgElement = new Image();
             imgElement.onload = function() {
-                drawAndProcessImage(imgElement);
+                drawAndPrepImage(imgElement);
+                if (autoprocess) {
+                    convertImage();
+                }
             };
             imgElement.src = `data:image/png;base64,${imageData}`;
 
@@ -114,7 +107,7 @@ function handleImageUpload(event) {
             originalImageElement = new Image();
             originalImageElement.id = 'uploaded-image';
             originalImageElement.onload = () => {
-                drawAndProcessImage(originalImageElement);
+                drawAndPrepImage(originalImageElement);
             };
             document.getElementById('original-image').appendChild(originalImageElement);
         }
@@ -151,6 +144,13 @@ function processImage(imgElement) {
         document.getElementById('processing-status').style.display = 'none';
         document.getElementById('generate-button').disabled = false;
     }, 0); // Set delay to 0 to allow the UI to update
+
+    // Ensure grid height does not exceed 70% of the viewport height
+    const gridHeight = document.querySelector('.grid').clientHeight;
+    const viewportHeight = window.innerHeight * 0.7;
+    if (gridHeight > viewportHeight) {
+        document.querySelector('.grid').style.height = `${viewportHeight}px`;
+    }
 }
 
 
@@ -1005,7 +1005,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
     epsilonSlider.addEventListener('input', function() {
         epsilonValueDisplay.textContent = epsilonSlider.value;
-        // convertImage(); // Automatically run convertImage on change
     });
 
     window.showTab = function(tabName) {
@@ -1023,18 +1022,22 @@ document.addEventListener('DOMContentLoaded', (event) => {
 
     // Fill inputs with URL parameters if they exist
     fillInputsFromParams({ apikey, prompt });
+    if (apikey) {  
+        document.getElementById('api-key-group').style.display = 'none'; 
+    }
 
     // Generate image if all parameters are present
     if (apikey && prompt && run) {
         setDefaultsForAutoGenerate();
-        generateImage(apikey, prompt);
+        generateImage(apikey, prompt, run);
+        convertImage();
     }
 
     // Add event listener to the button inside the DOMContentLoaded event
     document.getElementById('gen-image-button').addEventListener('click', () => {
         let apiKey = document.getElementById('api-key').value;
         const prompt = document.getElementById('prompt').value + (document.getElementById('googly-eyes').checked ? ' with disproportionately large googly eyes' : '');
-        generateImage(apiKey, prompt);
+        generateImage(apiKey, prompt, false);
     });
     
 });
