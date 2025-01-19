@@ -90,6 +90,8 @@ Make sure your Sand Garden is connected to your computer using the USB cord. The
 1. Specify the comport for the serial connection to the Sand Garden. You can find this on the HackPack IDE page - it will be something like "COM4".
 2. Enter your OpenAI Api Key. This is needed so that the image2sand website can make the request for the image to generate from the prompt.
 
+When you run it, it will start listening for voice input. When it hears "Draw [something]" it will send a request to the Image2Sand website for the coordinates. Then when it receives them, it will plot a graph of the planned image, and then send the coordinates to the sand garden one at a time, highlighting on another plot what part of the image it is drawing. When it finishes drawing, it will start listening again for the next thing to draw.
+
 ## Steps
 * Get an OpenAI API key from https://platform.openai.com/ and make sure it allows access to Dall-E-2 and Dall-E-3 models.
 * Deploy the code in Voice2Sand.ino to your Arduino using the HackPack IDE. You can either copy/paste the whole file contents into Level 3 on the IDE, or just make the changes to add in the additional pattern. Make a note of the port specified in the IDE that is used to connect to the Sand Garden - you'll need this in the next step.
