@@ -1037,7 +1037,7 @@ document.addEventListener('DOMContentLoaded', (event) => {
 
         if (apiKey == '') {
             // Use demo API key with restricted credit until depleted:
-            apiKey = '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';
+            apiKey = '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';
         }
         
         generateImage(apiKey, prompt);
