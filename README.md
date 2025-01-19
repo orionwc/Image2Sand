@@ -3,7 +3,7 @@ Two hacks for Mark Rober's Crunchlabs Sand Garden Hackpack that allows you to:
 * Image2Sand - Upload an image and convert it into points that can be drawn on the sand garden
 * Voice2Sand - Simply verbally specify to your computer the image you want it to draw, and it will generate an image based off of your prompt then convert it to points and then stream those points to the sand garden. Essentially just converting your voice into a sand garden image!
 
-## Image2Sand
+# Image2Sand
 A hack for Mark Rober's Crunchlabs Sand Garden Hackpack that converts an image into a pattern that can be drawn in the sand.
 
 This is early-stage and it's not going to work for every image -- but at this time, images that work well are ones you visibly see the outline by eye, such as a silhouette, a line drawing (it will detect the outer outline), or those with really high contrast. In all these cases, it will most likely find the outer bounds of the object and be able to draw this.
@@ -55,7 +55,30 @@ See https://github.com/orionwc/Image2Sand/commit/e6f938ae25ba4a1b92c95af3d917c11
 * Explore improvements to memory utilization so more points can be included
 
 ## For more context, see [the youtube video](https://youtu.be/fOfYCiM7BC8) linked at the bottom of the web page.
-# *If you found this interesting or cool, please *Subscribe to [My Youtube Channel](https://www.youtube.com/@InspiredByOrion) by clicking the link at the bottom of the page.**
+## *If you found this interesting or cool, please *Subscribe to [My Youtube Channel](https://www.youtube.com/@InspiredByOrion) by clicking the link at the bottom of the page.**
 
 # Voice2Sand
-dadoobady stuff
+Stuff goes here
+
+## Summary
+There are 3 parts to this project:
+
+1. A python program that listens to and transcribes you voice using the computers microphone then ditermines if the word "Draw" is in your scentance then uses that as the prompt for Image2Sand.
+2. An update to Image2Sand that allows the user to generate images via AI and also allows the python program to use it to generate the coordanates from the prompt.
+3. Code for the Arduino that will allow coordanates to be streamed one by one from the python program and draws them on the sand garden.
+
+## Part 1
+
+## Part 2
+
+## Part 3
+
+## Steps
+
+## Other info
+
+## Known Bugs
+
+## Possible Future Improvements
+
+## For more context, see [the Voice2Sand youtube video](https://youtu.be/INSERT.LINK.HERE) linked at the bottom of the web page.
