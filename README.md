@@ -28,7 +28,7 @@ The website is available at: https://orionwc.github.io/Image2Sand/
      * The coordinates of the points and the sequence to visit them are output at the bottom of the page. Note that these are output as INTEGERS to reduce memory consuption when read by the Arduino code. The box includes a series of points that are at (r, theta), and we scale them so that r takes a value between 0-1000. theta represents the angle in tengths of a degree. 
  * 2 settings are exposed - if you change these, you would need to click the "Generate Coordinates" button to see the updated image.
    * The first is the epsilon parameter -- when it's very small (e.g. 0.1), the image representation is likely more costly because of the complexity. Small epsilon also results in the points being very close together and capturing the detail in the contours. However, the Arduino struggles to handle a large number of points and causes an out of memory error when the number of points exceeds about 130 in the current implementation. 
-     * The second is a countour setting -- "External" is recommended, which will focus on getting the outline of the image. But the Tree-based approach to detect internal contours is available as an experimental option. If you select this, it may take a lot longer to process an image, especially if has a lot of contours or is very large.
+     * The second is a countour setting -- "External" is recommended, which will focus on getting the outline of the image. But the Tree-based approach (Internal+External) to detect internal contours is available as an experimental option. If you select this, it may take a lot longer to process an image, especially if has a lot of contours or is very large.
   * You can try adjusting these values to get an Sand Garden plot you're happy with. Then copy the entry in the coordinates box at the bottom to the clipboard to paste in to the Arduino code to generate your pattern.
 
 
@@ -70,11 +70,11 @@ There are 3 parts to this project:
 ## Part 1
 
 The Image2Sand website is updated from this github repo at https://orionwc.github.io/Image2Sand/. You're able to see the code here, but you can also just use the website to generate the images, either manually or programatically.
-The update adds a tab "Generate an Image" so you can choose this instead of uploading one. For this to work, you have to enter an API key for OpenAI that has access to the Dall-E-2 and Dall-E-3 models. You can request from from https://platform.openai.com/. It's not included here as all the code is publically viewable. You can specify it either in the text box, or in the URL using https://orionwc.github.io/Image2Sand/?apikey=<insert your api key>.
+The update adds a tab "Generate an Image" so you can choose this instead of uploading one. For this to work, you have to enter an API key for OpenAI that has access to the Dall-E-2 and Dall-E-3 models. You can request from from https://platform.openai.com/. It's not included here as all the code is publically viewable. You can specify it either in the text box, or in the URL using https://orionwc.github.io/Image2Sand/?apikey=[insert your api key].
 
 The website also supports these arguments:
-* apikey = <your OpenAI API key>
-* prompt = <the text to use to generate an image>
+* apikey = your OpenAI API key
+* prompt = the text to use to generate an image
 * run = 1 will directly generate the coordinates for the prompt and just return them in a simplified UI
 
 ## Part 2
