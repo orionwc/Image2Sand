@@ -965,7 +965,8 @@ function fillInputsFromParams(params) {
 function setDefaultsForAutoGenerate() {
     document.getElementById('epsilon-slider').value = 1;
     document.getElementById('dot-number').value = 300;
-    document.getElementById('no-shortcuts').value = true;
+    document.getElementById('no-shortcuts').checked = true;
+    document.getElementById('is-loop').checked = true;
     document.getElementById('contour-mode').value = 'Tree';
     hiddenResponse();
 }
