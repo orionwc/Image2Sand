@@ -15,7 +15,7 @@ import pyttsx3
 # ------------------------------------------------------------------------------------------------------------------------------------------------------
 # IMPORTANT: Insert your OpenAI API key here. It will need be to given permission for DALL-E-2 and DALL-E-3 models.
 # IMPORTANT: Set the COM ports to the one connected  to the Sand Garden
-apikey = "" # Your OpenAI API Key
+apikey = "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" # Your OpenAI API Key
 comport = "COM4" # The port used to connect to the Sand Garden. You can find this at the top of the HackPack IDE to the left of the RESTORE CODE button.
 # ------------------------------------------------------------------------------------------------------------------------------------------------------
 webpage = "https://orionwc.github.io/Image2Sand/"
