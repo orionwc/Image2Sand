@@ -11,6 +11,8 @@ from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.chrome import ChromeDriverManager
 import urllib.parse
 import pyttsx3
+# To use these libraries, run:
+# pip install pyserial matplotlib numpy SpeechRecognition selenium webdriver-manager pyttsx3
 
 # ------------------------------------------------------------------------------------------------------------------------------------------------------
 # IMPORTANT: Insert your OpenAI API key here. It will need be to given permission for DALL-E-2 and DALL-E-3 models.
