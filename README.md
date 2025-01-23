@@ -106,7 +106,11 @@ When you run it, it will start listening for voice input. When it hears "Draw [s
 * Get an OpenAI API key from https://platform.openai.com/ and make sure it is configured to allow access to Dall-E-2 and Dall-E-3 models.
 * Deploy the code in Voice2Sand.ino to your Arduino using the HackPack IDE. You can either copy/paste the whole file contents into Level 3 on the IDE, or just make the changes to add in the additional pattern. Make a note of the port specified in the IDE that is used to connect to the Sand Garden - you'll need this in the next step.
 * Download Voice2Sand.py and update the comport and apikey values using the values identified in the previous 2 steps.
-* Ensure you have Python installed and that all dependency libraries in the script are installed (there are details in the code on how to install using pip)
+* Ensure you have Python installed and that all required packages are installed.
+   * To install Python, see https://realpython.com/installing-python/
+   * To install pip to manage packacges, see https://realpython.com/what-is-pip/
+   * Then use pip to install the required packages by running:
+   * pip install pyserial matplotlib numpy SpeechRecognition selenium webdriver-manager pyttsx3
 * Leave the serial connection intact and run the Python code - it will start listening for voice input usig your computer microphone. You should see Arduino reboot and then wait for you to select a pattern. Choose number 11 (1011 in binary) using the joystick and then it will wait for input.
 * Say "Draw [any prompt]" into your computer microphone (e.g. "Draw an elephant"). The Python program should take it from here, requesting the coordinates from orionwc.github.io/Image2Sand/ and then streaming them to the Arduino.
 
