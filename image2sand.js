@@ -37,6 +37,9 @@ function drawAndPrepImage(imgElement) {
 
     // Set originalImageElement to the current image
     originalImageElement = imgElement;
+
+    // Enable Generate button
+    document.getElementById('generate-button').disabled = false;
 }
 
 
@@ -150,20 +153,6 @@ function processImage(imgElement) {
     const viewportHeight = window.innerHeight * 0.7;
     if (gridHeight > viewportHeight) {
         document.querySelector('.grid').style.height = `${viewportHeight}px`;
-    }
-}
-
-
-
-function adjustEpsilon(epsilon, pointsOver) {
-    if (pointsOver > 100) {
-        return epsilon + 1.0;
-    } else if (pointsOver <= 20) {
-        return epsilon + 0.1;
-    } else {
-        // Scale adjustment for points over the target between 20 and 100
-        let scale = (pointsOver - 20) / (100 - 20); // Normalized to range 0-1
-        return epsilon + 0.1 + 0.9 * scale;  // Adjust between 0.1 and 1.0
     }
 }
 
@@ -336,21 +325,24 @@ function reorderContours(contours, path) {
 
     for (let i = 0; i < path.length; i++) {
         const contourIndex = path[i];
-        const contour = contours[contourIndex];
+        let contour = contours[contourIndex];
 
         // Determine the direction to use the contour
         if (i > 0) {
             const prevContour = orderedContours[orderedContours.length - 1];
             const prevPoint = prevContour[prevContour.length - 1];
-
-            if (prevPoint && contour[0]) {
+            
+            if (isFullyClosed(contour)) {
+                // Contour is fully closed, so can move the startPoint
+                contour = reorderPointsForLoop(contour, startNear = prevPoint)
+            } else if (prevPoint && contour[0]) {
+                // Contour not fully closed, decide whether to reverse contour
                 const startToStart = Math.hypot(prevPoint.x - contour[0].x, prevPoint.y - contour[0].y);
                 const startToEnd = Math.hypot(prevPoint.x - contour[contour.length - 1].x, prevPoint.y - contour[contour.length - 1].y);
 
                 if (startToEnd < startToStart) {
                     contour.reverse();
                 }
-                
             } else {
                 console.error('Previous point or current contour start point is undefined.', { prevPoint, currentStart: contour[0] });
                 continue; // Skip if any point is undefined
@@ -504,13 +496,49 @@ function dijkstraWithMinimalJumps(graph, startIdx, endIdx) {
 }
 
 
-function checkContourClosure(contour) {
-    const firstPoint = { x: contour.intPtr(0)[0], y: contour.intPtr(0)[1] };
-    const lastPoint = { x: contour.intPtr(contour.rows - 1)[0], y: contour.intPtr(contour.rows - 1)[1] };
-    return firstPoint.x === lastPoint.x && firstPoint.y === lastPoint.y;
+function adjustEpsilon(epsilon, pointsOver) {
+    if (pointsOver > 100) {
+        return epsilon + 0.5;
+    } else if (pointsOver <= 20) {
+        return epsilon + 0.1;
+    } else {
+        // Scale adjustment for points over the target between 20 and 100
+        let scale = (pointsOver - 20) / (100 - 20); // Normalized to range 0-1
+        return epsilon + 0.1 + 0.5 * scale;  // Adjust between 0.1 and 0.5
+    }
 }
 
+// Checks if a contour is nearly closed
+function isNearlyClosed(contour, percentThreshold = 0.1) {
+    // Get the bounding box of the contour
+    const rect = cv.boundingRect(contour);
+    const size = Math.sqrt(rect.width * rect.width + rect.height * rect.height);
 
+    // Calculate the distance between the first and last points
+    const startPoint = { x: contour.intPtr(0)[0], y: contour.intPtr(0)[1] };
+    const endPoint = { x: contour.intPtr(contour.rows - 1)[0], y: contour.intPtr(contour.rows - 1)[1] };
+    const distance = Math.sqrt((startPoint.x - endPoint.x) ** 2 + (startPoint.y - endPoint.y) ** 2);
+
+    // Use a threshold based on the size of the object
+    const threshold = size * percentThreshold;
+    return (distance < threshold);
+}
+
+// Check if contour is fully closed
+function isContourClosed(contour) {
+    // Calculate the distance between the first and last points
+    const startPoint = { x: contour.intPtr(0)[0], y: contour.intPtr(0)[1] };
+    const endPoint = { x: contour.intPtr(contour.rows - 1)[0], y: contour.intPtr(contour.rows - 1)[1] };
+    
+    return (startPoint === endPoint);
+}
+
+// Checks if a PointList has the same first and last point
+function isFullyClosed(points) {
+    return ((points[0].x === points[points.length - 1].x) && (points[0].y === points[points.length - 1].y));
+}
+
+// Closes a contour by adding the first point at the end
 function closeContour(points) {
     if (points.length > 1 && (points[0].x !== points[points.length - 1].x || points[0].y !== points[points.length - 1].y)) {
         points.push({ x: points[0].x, y: points[0].y });
@@ -518,24 +546,45 @@ function closeContour(points) {
     return points;
 }
 
+function areContoursSimilar(contour1, contour2, similarityThreshold) {
+    // Calculate the bounding boxes of the contours
+    const rect1 = cv.boundingRect(contour1);
+    const rect2 = cv.boundingRect(contour2);
 
-function adjustEpsilon(epsilon, pointsOver) {
-    if (pointsOver > 100) {
-        return epsilon + 1.0;
-    } else if (pointsOver <= 20) {
-        return epsilon + 0.1;
-    } else {
-        // Scale adjustment for points over the target between 20 and 100
-        let scale = (pointsOver - 20) / (100 - 20); // Normalized to range 0-1
-        return epsilon + 0.1 + 0.9 * scale;  // Adjust between 0.1 and 1.0
-    }
+    // Calculate the similarity based on area difference
+    const area1 = rect1.width * rect1.height;
+    const area2 = rect2.width * rect2.height;
+    const similarity = Math.abs(area1 - area2) / Math.max(area1, area2);
+
+    return similarity < similarityThreshold;
 }
 
+function deduplicateContours(contours, similarityThreshold = 0.05) {
+    const uniqueContours = [];
+    for (let i = 0; i < contours.size(); i++) {
+        const contour = contours.get(i);
+        let isDuplicate = false;
+        for (let j = 0; j < uniqueContours.length; j++) {
+            if (areContoursSimilar(contour, uniqueContours[j], similarityThreshold)) {
+                isDuplicate = true;
+                break;
+            }
+        }
+        if (!isDuplicate) {
+            uniqueContours.push(contour);
+        }
+    }
+    return uniqueContours;
+}
 
 function getOrderedContours(edgeImage, initialEpsilon, retrievalMode, maxPoints) {
     const contours = new cv.MatVector(), hierarchy = new cv.Mat();
     cv.findContours(edgeImage, contours, hierarchy, retrievalMode, cv.CHAIN_APPROX_SIMPLE);
-    
+    console.log("# Contours: ", contours.size());
+
+    // Deduplicate contours
+    const uniqueContours = deduplicateContours(contours);
+
     const maxIterations = 100;  // Maximum iterations to avoid infinite loop
 
     let contourPoints = [];
@@ -546,27 +595,31 @@ function getOrderedContours(edgeImage, initialEpsilon, retrievalMode, maxPoints)
     do {
         totalPoints = 0;
         contourPoints = [];
-        
-        for (let i = 0; i < contours.size(); i++) {
-            const contour = contours.get(i);
+
+        for (let i = 0; i < uniqueContours.length; i++) {
+            const contour = uniqueContours[i]; // Use [] to access array elements
             const simplified = new cv.Mat();
             cv.approxPolyDP(contour, simplified, epsilon, true);
-
+        
             let points = [];
             for (let j = 0; j < simplified.rows; j++) {
                 const point = simplified.intPtr(j);
                 points.push({ x: point[0], y: point[1] });
             }
             simplified.delete();
-
+        
             if (points.length > 0) {  // Check for empty contours
-                if (checkContourClosure(contour)) {
+                if (isNearlyClosed(contour)) {  // Only close the contour if it's nearly closed
                     points = closeContour(points);
+                }
+                if (isFullyClosed(points)) {
+                    // Move starting point to nearest the center
+                    points = reorderPointsForLoop(points);
                 }
                 contourPoints.push(points);
                 totalPoints += points.length;
             }
-        }
+        }        
 
         if (totalPoints > maxPoints) {
             let pointsOver = totalPoints - maxPoints;
@@ -584,7 +637,6 @@ function getOrderedContours(edgeImage, initialEpsilon, retrievalMode, maxPoints)
         console.error("No valid contours found.");
         return [];
     }
-
 
     // Calculate distances and find the best path
     const distances = calculateDistances(contourPoints);
@@ -642,7 +694,7 @@ function traceContours(orderedContours, isLoop = false, minimizeJumps = true) {
         }
     }
 
-    // Add the last contour as it doesn't need a connecting path and not looping
+    // If not looping, add the last contour as it doesn't need a connecting path and wasn't added above
     if (!isLoop) { result.push(orderedContours[orderedContours.length - 1]); }
 
     return result;
@@ -741,11 +793,17 @@ function generateDots(edgeImage) {
 
     let orderedPoints = tracedContours.flat();
 
-    if (isLoop) {
+    // Should always be the case for isLoop
+    if (isFullyClosed(orderedPoints) || isLoop) {
         orderedPoints = reorderPointsForLoop(orderedPoints);
     }
 
     orderedPoints = removeConsecutiveDuplicates(orderedPoints);
+
+    // For final output - if last point is same as first point, drop it.
+    if (isFullyClosed(orderedPoints)) {
+        orderedPoints = [...orderedPoints.slice(0,orderedPoints.length-1)];
+    }
 
     const polarPoints = drawDots(orderedPoints);
     WriteCoords(polarPoints, singleByte);
@@ -768,14 +826,13 @@ function WriteCoords(polarPoints, singleByte = false){
 }
 
 
-function reorderPointsForLoop(points) {
-    const centroid = calculateCentroid(points);
+function reorderPointsForLoop(points, startNear = calculateCentroid(points)) {
     let minDist = Infinity;
     let startIndex = 0;
 
     // Find the point nearest to the centroid
     points.forEach((point, index) => {
-        const dist = Math.hypot(point.x - centroid.x, point.y - centroid.y);
+        const dist = Math.hypot(point.x - startNear.x, point.y - startNear.y);
         if (dist < minDist) {
             minDist = dist;
             startIndex = index;
@@ -783,7 +840,8 @@ function reorderPointsForLoop(points) {
     });
 
     // Reorder points to start from the point nearest to the centroid
-    return [...points.slice(startIndex), ...points.slice(0, startIndex)];
+    return removeConsecutiveDuplicates([...points.slice(startIndex), ...points.slice(0, startIndex+1)]);
+    
 }
 
 
@@ -963,7 +1021,7 @@ function fillInputsFromParams(params) {
 
 
 function setDefaultsForAutoGenerate() {
-    document.getElementById('epsilon-slider').value = 1;
+    document.getElementById('epsilon-slider').value = 0.5;
     document.getElementById('dot-number').value = 300;
     document.getElementById('no-shortcuts').checked = true;
     document.getElementById('is-loop').checked = true;
