@@ -775,7 +775,7 @@ function generateDots(edgeImage) {
         contourMode = document.getElementById('contour-mode').value,
         isLoop = document.getElementById('is-loop').checked,
         minimizeJumps = document.getElementById('no-shortcuts').checked,
-        singleByte = document.getElementById('single-byte').checked,
+        outputFormat = parseInt(document.getElementById('output-type').value),
         maxPoints = parseInt(document.getElementById('dot-number').value);
         // useGaussianBlur = document.getElementById('gaussian-blur-toggle').checked,
     const retrievalMode = (contourMode == 'External') ?  cv.RETR_EXTERNAL : cv.RETR_TREE;    
@@ -806,20 +806,34 @@ function generateDots(edgeImage) {
     }
 
     const polarPoints = drawDots(orderedPoints);
-    WriteCoords(polarPoints, singleByte);
+    WriteCoords(polarPoints, outputFormat);
     drawConnections(polarPoints);
     document.getElementById('total-points').innerText = `(${orderedPoints.length} Points)`;
 }
 
 
-function WriteCoords(polarPoints, singleByte = false){
-    let formattedPoints = '';
-    if (!singleByte) {
-        formattedPolarPoints = polarPoints.map(p => `{${p.r.toFixed(0)},${p.theta.toFixed(0)}}`).join(',');
-    } else {
-        formattedPolarPoints = polarPoints.map(p => `{${Math.round(255 * p.r / 1000)},${Math.round(255 * p.theta / 3600)}}`).join(',');
+function WriteCoords(polarPoints, outputFormat = 0){
+    let formattedPolarPoints = '';
+    switch (outputFormat) {
+        case 0: //Default
+            formattedPolarPoints = polarPoints.map(p => `{${p.r.toFixed(0)},${p.theta.toFixed(0)}}`).join(',');
+            break;
+
+        case 1: //Single Byte
+            formattedPolarPoints = polarPoints.map(p => `{${Math.round(255 * p.r / 1000)},${Math.round(255 * p.theta / 3600)}}`).join(',');
+            break;
+
+        case 2: //.thr
+            formattedPolarPoints = polarPoints.map(p => `${(p.theta * Math.PI / 1800).toFixed(5)} ${(p.r / 1000).toFixed(5)}`).join("\n");
+            break;
+
+        case 3: // whitespace (might cause problems as it outputs a space)
+            formattedPolarPoints = polarPoints.map(p => `${Math.round(255 * p.r / 1000).toString(2).padStart(8,'0').replaceAll('0',' ').replaceAll('1',"\t")}${Math.round(255 * p.theta / 3600).toString(2).padStart(8,'0').replaceAll('0',' ').replaceAll('1',"\t")}`).join("\n");
+
+        default: 
+            break;
     }
-    
+   
     document.getElementById('polar-coordinates-textarea').value = formattedPolarPoints;
     document.getElementById('simple-coords').textContent = formattedPolarPoints;
     document.getElementById('simple-coords-title').style = 'visibility: hidden';
