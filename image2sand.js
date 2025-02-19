@@ -551,15 +551,29 @@ function areContoursSimilar(contour1, contour2, similarityThreshold) {
     const rect1 = cv.boundingRect(contour1);
     const rect2 = cv.boundingRect(contour2);
 
-    // Calculate the similarity based on area difference
+    // Calculate the intersection of the bounding boxes
+    const x1 = Math.max(rect1.x, rect2.x);
+    const y1 = Math.max(rect1.y, rect2.y);
+    const x2 = Math.min(rect1.x + rect1.width, rect2.x + rect2.width);
+    const y2 = Math.min(rect1.y + rect1.height, rect2.y + rect2.height);
+
+    // Check if there is an intersection
+    const intersectionWidth = Math.max(0, x2 - x1);
+    const intersectionHeight = Math.max(0, y2 - y1);
+    const intersectionArea = intersectionWidth * intersectionHeight;
+
+    // Calculate the union of the bounding boxes
     const area1 = rect1.width * rect1.height;
     const area2 = rect2.width * rect2.height;
-    const similarity = Math.abs(area1 - area2) / Math.max(area1, area2);
+    const unionArea = area1 + area2 - intersectionArea;
 
-    return similarity < similarityThreshold;
+    // Calculate the similarity based on the intersection over union (IoU)
+    const similarity = intersectionArea / unionArea;
+
+    return similarity > similarityThreshold;
 }
 
-function deduplicateContours(contours, similarityThreshold = 0.05) {
+function deduplicateContours(contours, similarityThreshold = 0.5) {
     const uniqueContours = [];
     for (let i = 0; i < contours.size(); i++) {
         const contour = contours.get(i);
