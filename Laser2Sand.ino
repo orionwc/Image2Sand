@@ -35,7 +35,7 @@ INCLUDED LIBRARIES
 #include <AccelStepper.h>             //Controls the stepper motors
 #include <FastLED.h>                  //Controls the RGB LEDs
 #include <OneButtonTiny.h>            //Button management and debouncing
-
+#include <IRremote.hpp>               //IR remote receiver management
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /*
@@ -111,7 +111,8 @@ Useful values and limits for defining how the sand garden will behave. In most c
   #define MOTORR_IN4_PIN   5
 #endif
 
-  
+#define IR_RECEIVE_PIN     3         //Pin that IR Receiver is connected to ***** ENSURE THIS MATCHES WHERE YOU CONNECT IT *****
+
 #define JOYSTICK_A_PIN   A2          //Left-right axis of joystick, associated with changing angular axis in manual mode
 #define JOYSTICK_R_PIN   A3          //Up-down axis of joystick, associated with changing radial axis in manual mode
 #define BUTTON_PIN       A1          //Joystick button pin
@@ -139,7 +140,18 @@ AccelStepper stepperRadius(4, MOTORR_IN1_PIN, MOTORR_IN3_PIN, MOTORR_IN2_PIN, MO
 struct Positions {
   int radial;                     //the units for these values are motor steps
   int angular;                    
+};
+
+// Struct used for storing coordinates of the image to draw
+struct PatternPositions {
+  uint8_t radial;                     //the units for these values are motor steps
+  uint8_t angular;                    
 };                                
+
+//These variables are used to manage the pattern received via IR
+PatternPositions IRpattern[100];   //Buffer to store pattern received via IR
+short int IRpatternArrayPos = 0;   //Current number of coordinates received via IR
+uint8_t expectedCoords = 0;        //Received value that indicates the expected total number of coordinates to be received via IR
 
 //These variables of type Positions (defined above) are for storing gantry positions and joystick values
 Positions currentPositions;       //store the current positions of the axes in this
@@ -159,6 +171,7 @@ Positions pattern_PentagonRainbow(Positions current, bool restartPattern = false
 Positions pattern_RandomWalk1(Positions current, bool restartPattern = false);                //Random walk 1 (connected by arcs)
 Positions pattern_RandomWalk2(Positions current, bool restartPattern = false);                //Random walk 2 (connected by lines)
 Positions pattern_AccidentalButterfly(Positions current, bool restartPattern = false);        //Accidental Butterfly
+Positions pattern_IRPicture(Positions current, bool restartPattern = false);                  //Custom Picture received over IR receiver
 
 /**
  * @brief Typedef for storing pointers to pattern-generating functions.
@@ -189,7 +202,7 @@ typedef Positions (*PatternFunction)(Positions, bool);
  * but keep it in mind when working with the array.
  */
 PatternFunction patterns[] = {pattern_SimpleSpiral, pattern_Cardioids, pattern_WavySpiral, pattern_RotatingSquares, pattern_PentagonSpiral, pattern_HexagonVortex, pattern_PentagonRainbow, pattern_RandomWalk1,
-                              pattern_RandomWalk2, pattern_AccidentalButterfly};
+                              pattern_RandomWalk2, pattern_AccidentalButterfly, pattern_IRPicture};
 
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -284,19 +297,21 @@ public:
  * to determine which LEDs should be turned on.
  *
  * @param value The current pattern number, where 255 indicates manual drawing mode, and other values indicate specific patterns.
+ * @param ignoreManualMode If set to true, then don't treat 255 input differently, but rather use it to set all LEDs on.
+ * @param color Provide a color to light all LEDs
  * 
  * @note The .fadePixels() method can be used to make the LEDs fade, indicating that the machine is running a pattern. This function 
  * uses bitwise operations to determine the LED pattern, lighting the LEDs in MediumVioletRed for non-manual patterns.
  */
-  void indicatePattern(uint8_t value) {                     //used for showing which pattern is selected
+  void indicatePattern(uint8_t value, bool ignoreManualMode = false, CRGB color = CRGB::MediumVioletRed) {                     //used for showing which pattern is selected
     FastLED.clear();
-    if (value == 255) {                                     //pattern255 is the manual drawing mode.
+    if (!ignoreManualMode && value == 255) {                                     //pattern255 is the manual drawing mode.
       FastLED.clear();
       leds[0] = CRGB::DarkCyan;
     } else {                                                //all other patterns can be displayed with bitwise operations
       for (int i = 0; i < NUM_LEDS; i++) {                  //iterate through each LED in the array
         if (value & (1 << i)) {                             //bitwise AND the value of each bit in the pattern number to determine if current LED needs to be turned on. 
-          leds[NUM_LEDS - 1 - i] = CRGB::MediumVioletRed;   //turn on the LED if needed
+          leds[NUM_LEDS - 1 - i] = color;   //turn on the LED if needed
         }
       }
     }
@@ -431,6 +446,9 @@ void setup() {
   pinMode(JOYSTICK_A_PIN, INPUT);
   pinMode(JOYSTICK_R_PIN, INPUT);
 
+  //Configure the IR Receiver
+  IrReceiver.begin(IR_RECEIVE_PIN, ENABLE_LED_FEEDBACK);
+
   //Set up the button.
   //Single press of button is for starting or stopping the current pattern.
   button.attachClick([]() {       //This is called a lambda function. Basically it's a nameless function that runs when the button is single pressed.
@@ -455,6 +473,65 @@ void setup() {
 }
 
 
+// Check if there's new data from IR Receiver
+void handleIRReception() {
+  static bool hasRadial = false, hasAngular = false;
+
+  if (IrReceiver.decode()) {
+    uint8_t receivedValue = IrReceiver.decodedIRData.command;
+    uint8_t identifier = IrReceiver.decodedIRData.address; // Read the identifier
+    if (identifier == 0x03) { // NumCoordinates identifier
+      expectedCoords = receivedValue;
+      display.indicatePattern(255, true, CRGB::Red);
+    } else if (identifier == 0x01) { // Radial identifier
+      IRpattern[IRpatternArrayPos].radial = receivedValue;
+      hasRadial = true;
+      if (expectedCoords == 0) {
+      // Display the counter of data received if not received the total number expected
+      display.indicatePattern(IRpatternArrayPos % 256, true, CRGB::Red);
+      }
+    } else if (identifier == 0x02 && hasRadial) { // Angular identifier
+      IRpattern[IRpatternArrayPos].angular = receivedValue;
+      hasAngular = true;
+      if (expectedCoords == 0) {
+      // Display the counter of data received if not received the total number expected
+      display.indicatePattern(IRpatternArrayPos % 256, true, CRGB::Blue);
+      }
+    }
+    if (hasRadial && hasAngular) {
+      hasRadial = false;
+      hasAngular = false;
+      if ((IRpatternArrayPos > 0) 
+        && (IRpattern[IRpatternArrayPos].angular == IRpattern[IRpatternArrayPos-1].angular)
+        && (IRpattern[IRpatternArrayPos].radial == IRpattern[IRpatternArrayPos-1].radial) ) {
+        // Current position is the same as the last one -- Don't add it to the sequence
+      } else {
+        // Ensure max image size is not exceeded - (Don't add more points if it is)
+        if (IRpatternArrayPos < (sizeof(IRpattern) / sizeof(IRpattern[0]))) {
+          IRpatternArrayPos++; // Get ready for next coordinate
+          
+          if (expectedCoords > 0) { // Display progress bar
+            float floatProgress =  (float)(IRpatternArrayPos) / (float)(expectedCoords+1);
+            int progress = (int)(8.0f * floatProgress) + 1;
+            float remainder = floatProgress*8 - (progress+1);
+            int result = (1 << progress) - 1; // 2^progress using bitwise shift
+            int progressDisplay = result;
+
+            // Create instances of CRGB for red and green
+            CRGB red = CRGB::Red;
+            CRGB green = CRGB::Green;
+            // Calculate the interpolated color based on remainder
+            CRGB color = red.lerp8(green, (uint8_t)(remainder * 255));
+
+            display.indicatePattern(progressDisplay, true, color);
+          }
+        }
+      }
+    }
+    IrReceiver.resume(); // Ensure IR receiver is reset
+  }
+}
+
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /*
@@ -467,6 +544,9 @@ the gantry from the selected pattern functions or from manual mode.
 void loop() {
   //Check to see if the button has been pressed. This has to be called as often as possible to catch button presses.
   button.tick();
+
+  // Look for data from IR receiver
+  handleIRReception();
 
   //if the runPattern flag is set to true, we need to start updating target positions for the controller. run the appropriate pattern!
   if (runPattern) {
@@ -515,7 +595,12 @@ void loop() {
       #pragma region AutomaticMode
       //update the LED pattern display
       display.setBrightness(MAX_BRIGHTNESS);       
-      display.indicatePattern(currentPattern);     
+      
+      if (currentPattern < (sizeof(patterns)/sizeof(patterns[0]))) {
+        // Assumes that the IR Receiver Pattern is the last pattern
+        // Don't update the LEDs to display the pattern number if the IR Pattern is selected so that the LEDs can be used to show the progress of receiving the image
+        display.indicatePattern(currentPattern);
+      }  
       
       //check to see if the pattern has been switched
       if (currentPattern != lastPattern) {
@@ -563,8 +648,11 @@ void loop() {
         lastJoystickUpdate = 0;                             //reset the joystick update timer
       }
     } else {                                                //We're in automatic mode, which means it's time to select a pattern.
-      display.indicatePattern(currentPattern);
-      display.fadePixels(LED_FADE_PERIOD, MAX_BRIGHTNESS);  
+      if (currentPattern > 1) {
+        // Don't update the LEDs to display the pattern number if just turned on and set to (1) so that the LEDs can be used to show the progress of receiving the image via IR
+        display.indicatePattern(currentPattern);
+      }
+     display.fadePixels(LED_FADE_PERIOD, MAX_BRIGHTNESS);  
 
       if (lastJoystickUpdate >= 200 && joystickValues.radial >= 90) {                              //if it's been 200ms since last joystick update and joystick is pushed all the way up
         currentPattern++;                                                                          //increment pattern number by 1
@@ -1929,6 +2017,63 @@ Positions pattern_AccidentalButterfly(Positions current, bool restartPattern = f
 }
 
 
+/**
+ * HACK BY ORION (AKA: Magicaldroid)
+ *
+ * @brief Generates the next target position to follow the points within pointList
+ *
+ * @param pointList An array of all the points in the pattern stored in a PatternPositions struct.
+ * @param current The current position of the gantry, represented as a Positions struct.
+ * @param nodes Total number of points in the pattern
+ * @param repeat Whether to repeat the pattern after it's completed once.
+ * 
+ * @return Positions The next target position for the motion controller, represented as a Positions struct.
+ * 
+ */
+Positions drawPictureStep(PatternPositions pointList[], int nodes, Positions current, bool repeat = true)
+{
+  Positions target;
+  static int start = 0;
+  static int end = 1;
+
+  Positions startPoint = { (int)(pointList[start].radial * (float)MAX_R_STEPS/255), (int)convertDegreesToSteps((float)(pointList[start].angular)*1.40625) };
+  Positions endPoint = { (int)(pointList[end].radial * (float)MAX_R_STEPS/255), (int)convertDegreesToSteps((float)(pointList[end].angular)*1.40625) };
+
+  target = drawLine(startPoint, endPoint, current, 100);
+
+  if ((target.angular == endPoint.angular) && (target.radial == endPoint.radial)) {
+    start++;
+    end++;
+    start = start % nodes;
+    end = end % nodes;
+    if (start == 0 && !repeat) {
+      // Completed one loop and not repeating - Empty the IR Picture array
+      IRpatternArrayPos = 0;
+    }
+  }
+  return target;
+}
+
+/**
+ * HACK BY ORION (AKA: Magicaldroid)
+ *
+ * @brief Pattern: Draw A Picture. Generates the next target position for following the predefined image pattern
+ *
+ * This function connects the points specified in the array defined within this function
+ * This array of points is received using the IR Receiver and stored in the IRpattern buffer
+ *
+ * @param current The current position of the gantry, represented as a Positions struct.
+ * @param restartPattern A flag that allows restarting the pattern. Defaults to false.
+ * 
+ * @return Positions The next target position for the motion controller, represented as a Positions struct.
+ * 
+ */
+Positions pattern_IRPicture(Positions current, bool restartPattern = false) {  
+  if (IRpatternArrayPos > 5 || (expectedCoords > 0 && IRpatternArrayPos >= expectedCoords)) {
+    // Once there are at least 5 points (or number expected), start drawing
+    return drawPictureStep(IRpattern, IRpatternArrayPos, current, false);
+  }
+}
 
 
 #pragma endregion Patterns
