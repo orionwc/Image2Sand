@@ -133,7 +133,7 @@ There are 3 parts to this project:
 2. Code for the LaserTag Arduino (LaserTag-FireImage.ino) that will take a pattern generated using Image2Sand and transmit these coordinates using the infra-red emitter in the LaserTag device.
 3. Code for the Sand Garden Arduino (Laser2Sand.ino) that will receive a pattern of up to 100 coordinates sent via infra-red and draw it on the sand garden.
 
-(details coming soon)
+(details coming soon - if you want to get started now, connect the IR receiver that came with the LaserTag hackpack to Pin 3 on the Arduino in the Sand Garden to use the provided code)
 
 # Appendix
 
