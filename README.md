@@ -1,7 +1,8 @@
-# Image2Sand and Voice2Sand
-Two hacks for Mark Rober's Crunchlabs Sand Garden Hackpack that allows you to:
+# Image2Sand, Voice2Sand, and Laser2Sand
+Three hacks for Mark Rober's Crunchlabs Sand Garden Hackpack that allows you to:
 * Image2Sand - Upload an image and convert it into points that can be drawn on the sand garden
 * Voice2Sand - Simply verbally specify to your computer the image you want it to draw, and it will generate an image based off of your prompt then convert it to points and then stream those points to the sand garden. Essentially just converting your voice into a sand garden image!
+* Laser2Sand - Send a pattern over infrared using the LaserTag Hackpack; receive a pattern on the sand garden using a connected infra-red receiver, and draw it.
 
 # Image2Sand
 A hack for Mark Rober's Crunchlabs Sand Garden Hackpack that converts an image into a pattern that can be drawn in the sand.
@@ -121,6 +122,18 @@ If you have ideas on making it better, or have ideas on how to fix the bugs belo
 
 ## More info
 See this video on youtube: [AI-Powered Voice-Activated Sand Garden](https://youtu.be/AUMiR996WdU)
+
+# Laser2Sand
+A hack for Mark Rober's Crunchlabs LaserTag and Sand Garden Hackpacks that send an image using the IR transmitter on the LaserTag device and receive an image using an IR receiver connected to the sand garden, then draws it in the sand.
+
+## Summary
+There are 3 parts to this project:
+
+1. An update to Image2Sand that outputs coordinates as single-byte (0-255) values.
+2. Code for the LaserTag Arduino (LaserTag-FireImage.ino) that will take a pattern generated using Image2Sand and transmit these coordinates using the infra-red emitter in the LaserTag device.
+3. Code for the Sand Garden Arduino (Laser2Sand.ino) that will receive a pattern of up to 100 coordinates sent via infra-red and draw it on the sand garden.
+
+(details coming soon)
 
 # Appendix
 
