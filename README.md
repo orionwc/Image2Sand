@@ -133,7 +133,6 @@ There are 3 parts to this project:
 2. Code for the LaserTag Arduino (LaserTag-FireImage.ino) that will take a pattern generated using Image2Sand and transmit these coordinates using the infra-red emitter in the LaserTag device.
 3. Code for the Sand Garden Arduino (Laser2Sand.ino) that will receive a pattern of up to 100 coordinates sent via infra-red and draw it on the sand garden.
 
-//(details coming soon - if you want to get started now, connect the IR receiver that came with the LaserTag hackpack to Pin 3 on the Arduino in the Sand Garden to use the provided code)
 
 ## Part 1
 The Image2Sand website now supports an additional Output Type called "Single-Byte" - this stores the radial and angular components of the polar coordinates used to trace the image in a single byte each (value 0-255), so the full image needs less data to recreate it.
@@ -149,10 +148,11 @@ This modification to the Arduino code on the Sand Garden hackpack adds:
 
 ## Steps
 * Connect the IR Receiver that came with the LaserTag hackpack to the Arduino on the Sand Garden. This will have a red & black connector as well as a wire to indicate the signal on the receiver (likely blue). Connect the red and black wires to the red and black rails, and connect the signal wire to Pin 3 on the Arduino.
-* Visit the Image2Sand (LINK) website and create the pattern that you want download to the LaserTag gun. You can either upload an image, or use AI to create one (see Image2Sand above). The Output Format dropdown should be set to "Single-Byte", and you'll need to adjust settings (e.g. choose coarser image) so that there are no more than 100 points generated. Once you have the coordinatesm copy these to the clipboard.
-* Using Level 3 of the HackPack IDE for the Sand Garden, update the code on the Arduino. You can either copy/paste this code, or make the specific changes to the base code shown here (LINK). Deploy it to the Arduino.
-* Using Level 3 of the HackPack IDE for the LaserTag, update the code for the LaserTag. You can either copy/paste this code, or make the specific changes to the base code shown here (LINK).
-* Paste in the pattern generated in the second step into the LaserTag Arduino code in the sendIR_Pulse() function below the text "ADD PATTERN HERE". Deploy the updated code with the pattern in it to the Arduino.
+* Visit the Image2Sand (https://orionwc.github.io/Image2Sand) website and create the pattern that you want download to the LaserTag gun. You can either upload an image, or use AI to create one (see Image2Sand above). The Output Format dropdown should be set to "Single-Byte", and you'll need to adjust settings (e.g. choose coarser image) so that there are no more than 100 points generated. Once you have the coordinatesm copy these to the clipboard.
+* Using Level 3 of the [HackPack IDE](https://ide.crunchlabs.com) for the Sand Garden, update the code on the Arduino. You can either copy/paste this code, or make the specific changes to the base code shown [here](https://github.com/orionwc/Image2Sand/compare/edd2861
+..8b99467). Deploy it to the Arduino.
+* Using Level 3 of the [HackPack IDE](https://ide.crunchlabs.com) for the LaserTag, update the code for the LaserTag. You can either copy/paste [this code](https://github.com/orionwc/Image2Sand/blob/main/LaserTag-FireImage.ino), or make the specific changes to the base code shown [here](https://github.com/orionwc/Image2Sand/compare/c12cfc5..3b2dd0c).
+* Paste in the pattern generated in the second step into the LaserTag Arduino code in the sendIR_Pulse() function below the text "ADD PATTERN HERE" (or un-comment one of the included patterns). Deploy the updated code with the pattern in it to the Arduino.
 * Select Pattern 11 on the Sand Garden, then point the LaserTag gun at the infrared receiver on the Sand Garden and press the Trigger button. You should see the LEDs on the Sand Garden change and show a progress bar that will gradually fill up as the Sand Garden receives the transmitted image (reaching 8 green points once done). Keep pointing the LaserTag gun at the receiver until the progress bar is full, even after the image starts drawing.
 * The image will start drawing as soon as it has received the first 5 points. The buffer of coordinates will continue to fill up while the image is drawing. Once the Sand Garden moves the marble to the last coordinate in the buffer, it will empty the buffer and is ready to receive another image.
 
@@ -162,11 +162,11 @@ This modification to the Arduino code on the Sand Garden hackpack adds:
 * The Sand Garden LEDs don't show the pattern number for Pattern 1.
 
 ## More info
-See this video on youtube: [insert-video-title](https://youtu.be/WhateverTheLinkIs)
+See this video on youtube: [I hacked Mark Rober’s Laser Tag Gun to Beam Images!](https://youtu.be/HPhXki5c-Mc)
 
 ## Videos
 *    [I hacked Mark Rober's Sand Garden to Draw Any Image](https://youtu.be/fOfYCiM7BC8)
 *    [AI-Powered Voice-Activated Sand Garden](https://youtu.be/AUMiR996WdU)
-*    [insert-video-title](https://youtu.be/WhateverTheLinkIs)
+*    [I hacked Mark Rober’s Laser Tag Gun to Beam Images!](https://youtu.be/HPhXki5c-Mc)
 
 If you found this interesting or cool, please consider subscribing to [My Youtube Channel](https://www.youtube.com/@InspiredByOrion)
