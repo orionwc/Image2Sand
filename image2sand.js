@@ -1039,9 +1039,6 @@ function drawDots(points) {
         else if (diff < -Math.PI) {
             curr.theta += 2 * Math.PI;
         }
-        
-        // Accumulate the theta value from the previous point
-        curr.theta = prev.theta + (curr.theta - prev.theta);
     }
     
     // Convert to degrees * 10 for the final format
