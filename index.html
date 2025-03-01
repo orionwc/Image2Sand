@@ -146,7 +146,7 @@ SOFTWARE.
                         <select id="output-type">
                             <option value="0" title="Default output type for use in provided Arduino code" selected>Default</option>
                             <option value="1" title="Outputs coordinates scaled so the r and theta are between 0 and 255. This is useful if you want more points in less memory, but needs a code change on the Arduino code too.">Single-Byte</option>
-                            <option value="2" title="For pasting into .thr files compatible with Sisyphus sand garden">Theta-Rho</option>
+                            <option value="2" title="For pasting into .thr files compatible with Sisyphus sand garden and Dune Weaver Mini. Uses continuous theta values that can exceed 2π.">Theta-Rho (.thr)</option>
                             <option value="3" title="Outputs the coordinates scaled so the r and theta are between 0 and 255 in only whitespace characters (space and tab) using binary. WHY WOULD YOU SELECT THIS. IT IS A NIGHTMARE. DO NOT SELECT THIS.">Whitespace</option>
                         </select>
                     </div>
