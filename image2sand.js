@@ -1,3 +1,14 @@
+/*
+ * Image2Sand - Convert images to sand table coordinates
+ * 
+ * This script processes images and converts them to theta-rho coordinates
+ * for use with sand tables like Sisyphus and Dune Weaver Mini.
+ * 
+ * For Dune Weaver Mini compatibility, this script uses continuous theta values
+ * that can exceed 2π (360 degrees). This allows the arm to make multiple revolutions
+ * without creating unintended circles in the patterns.
+ */
+
 class PriorityQueue {
     constructor() {
         this.nodes = [];
@@ -834,15 +845,30 @@ function WriteCoords(polarPoints, outputFormat = 0){
             break;
 
         case 1: //Single Byte
-            formattedPolarPoints = polarPoints.map(p => `{${Math.round(255 * p.r / 1000)},${Math.round(255 * p.theta / 3600)}}`).join(',');
+            // For single byte format, we need to normalize the theta values
+            // We'll use modulo for this format since it's just for Arduino code
+            formattedPolarPoints = polarPoints.map(p => {
+                const normalizedTheta = ((p.theta % 3600) + 3600) % 3600; // Ensure positive value between 0-3600
+                return `{${Math.round(255 * p.r / 1000)},${Math.round(255 * normalizedTheta / 3600)}}`;
+            }).join(',');
             break;
 
         case 2: //.thr
-            formattedPolarPoints = polarPoints.map(p => `${(p.theta * Math.PI / 1800).toFixed(5)} ${(p.r / 1000).toFixed(5)}`).join("\n");
+            // For .thr format, we keep the continuous theta values
+            // Convert from tenths of degrees back to radians
+            formattedPolarPoints = polarPoints.map(p => 
+                `${(p.theta * Math.PI / 1800).toFixed(5)} ${(p.r / 1000).toFixed(5)}`
+            ).join("\n");
             break;
 
         case 3: // whitespace (might cause problems as it outputs a space)
-            formattedPolarPoints = polarPoints.map(p => `${Math.round(255 * p.r / 1000).toString(2).padStart(8,'0').replaceAll('0',' ').replaceAll('1',"\t")}${Math.round(255 * p.theta / 3600).toString(2).padStart(8,'0').replaceAll('0',' ').replaceAll('1',"\t")}`).join("\n");
+            // For whitespace format, we need to normalize the theta values
+            // We'll use modulo for this format
+            formattedPolarPoints = polarPoints.map(p => {
+                const normalizedTheta = ((p.theta % 3600) + 3600) % 3600; // Ensure positive value between 0-3600
+                return `${Math.round(255 * p.r / 1000).toString(2).padStart(8,'0').replaceAll('0',' ').replaceAll('1',"\t")}${Math.round(255 * normalizedTheta / 3600).toString(2).padStart(8,'0').replaceAll('0',' ').replaceAll('1',"\t")}`;
+            }).join("\n");
+            break;
 
         default: 
             break;
@@ -896,19 +922,54 @@ function drawDots(points) {
     const center = findMaximalCenter(points);
 
     points = points.map(p => ({ x: p.x - center.centerX, y: p.y - center.centerY }));
-    const polarPoints = points.map(p => {
+    
+    // Calculate initial angles for all points
+    let polarPoints = points.map(p => {
         const r = Math.sqrt(p.x * p.x + p.y * p.y);
-        let theta = Math.atan2(p.y, p.x) * (180 / Math.PI); // Convert radians to degrees
-        if (theta < 0) theta += 360; // Ensure theta is between 0 and 360
-
+        // Get the basic angle in radians
+        let theta = Math.atan2(p.y, p.x);
+        
         // Adjust theta to align 0 degrees to the right and 90 degrees up by flipping the y-axis
         theta = -theta;
-        if (theta < 0) theta += 360;
-
-        return { r: r * (1000 / Math.max(...points.map(p => Math.sqrt(p.x * p.x + p.y * p.y)))), theta: theta * 10 };
+        
+        return { 
+            r: r * (1000 / Math.max(...points.map(p => Math.sqrt(p.x * p.x + p.y * p.y)))), 
+            theta: theta, // Store in radians initially
+            x: p.x,
+            y: p.y
+        };
     });
+    
+    // Process points to create continuous theta values
+    for (let i = 1; i < polarPoints.length; i++) {
+        const prev = polarPoints[i-1];
+        const curr = polarPoints[i];
+        
+        // Calculate the difference between current and previous theta
+        let diff = curr.theta - prev.theta;
+        
+        // If the difference is greater than π, it means we've wrapped around counterclockwise
+        // Adjust by subtracting 2π
+        if (diff > Math.PI) {
+            curr.theta -= 2 * Math.PI;
+        }
+        // If the difference is less than -π, it means we've wrapped around clockwise
+        // Adjust by adding 2π
+        else if (diff < -Math.PI) {
+            curr.theta += 2 * Math.PI;
+        }
+        
+        // Accumulate the theta value from the previous point
+        curr.theta = prev.theta + (curr.theta - prev.theta);
+    }
+    
+    // Convert to degrees * 10 for the final format
+    polarPoints = polarPoints.map(p => ({
+        r: p.r,
+        theta: p.theta * (1800 / Math.PI) // Convert radians to tenths of degrees
+    }));
 
-    return polarPoints; // Return polarPoints
+    return polarPoints;
 }
 
 
@@ -1007,11 +1068,15 @@ function drawConnections(polarPoints) {
         const p1 = polarPoints[i];
         const p2 = polarPoints[i + 1];
 
+        // Convert from tenths of degrees to radians for visualization
+        const theta1 = p1.theta * Math.PI / 1800;
+        const theta2 = p2.theta * Math.PI / 1800;
+
         // Adjust y-coordinate calculation to invert the y-axis
-        const x1 = p1.r * Math.cos(p1.theta / 10 * Math.PI / 180) * scale;
-        const y1 = -p1.r * Math.sin(p1.theta / 10 * Math.PI / 180) * scale;
-        const x2 = p2.r * Math.cos(p2.theta / 10 * Math.PI / 180) * scale;
-        const y2 = -p2.r * Math.sin(p2.theta / 10 * Math.PI / 180) * scale;
+        const x1 = p1.r * Math.cos(theta1) * scale;
+        const y1 = -p1.r * Math.sin(theta1) * scale;
+        const x2 = p2.r * Math.cos(theta2) * scale;
+        const y2 = -p2.r * Math.sin(theta2) * scale;
 
         ctx.beginPath();
         ctx.moveTo(x1, y1);
