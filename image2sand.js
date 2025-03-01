@@ -1,12 +1,15 @@
 /*
  * Image2Sand - Convert images to sand table coordinates
  * 
- * This script processes images and converts them to theta-rho coordinates
- * for use with sand tables like Sisyphus and Dune Weaver Mini.
+ * This script processes images and converts them to polar coordinates
+ * according to the specified settings, supporting multiple output formats including:
+ *  Default: HackPack Sand Garden .ino in this repository
+ *  theta-rho format: for use with sand tables like Sisyphus and Dune Weaver Mini.
  * 
- * For Dune Weaver Mini compatibility, this script uses continuous theta values
- * that can exceed 2π (360 degrees). This allows the arm to make multiple revolutions
- * without creating unintended circles in the patterns.
+ * Note:
+ *  For Dune Weaver Mini compatibility, this script uses continuous theta values
+ *  that can exceed 2π (360 degrees). This allows the arm to make multiple revolutions
+ *  without creating unintended circles in the patterns.
  */
 
 class PriorityQueue {
@@ -914,7 +917,12 @@ function WriteCoords(polarPoints, outputFormat = 0){
     let formattedPolarPoints = '';
     switch (outputFormat) {
         case 0: //Default
-            formattedPolarPoints = polarPoints.map(p => `{${p.r.toFixed(0)},${p.theta.toFixed(0)}}`).join(',');
+            // For Image2Sand.ino code, we normalize the theta values
+            // We'll use modulo for this format
+            formattedPolarPoints = polarPoints.map(p => {
+            const normalizedTheta = ((p.theta % 3600) + 3600) % 3600; // Ensure positive value between 0-3600
+            return `{${p.r.toFixed(0)},${normalizedTheta.toFixed(0)}}`;
+        }).join(',');
             break;
 
         case 1: //Single Byte
