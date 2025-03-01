@@ -11,24 +11,75 @@
 
 class PriorityQueue {
     constructor() {
-        this.nodes = [];
+        this.heap = [];
     }
 
     enqueue(priority, key) {
-        this.nodes.push({ key, priority });
-        this.sort();
+        this.heap.push({ key, priority });
+        this._bubbleUp(this.heap.length - 1);
     }
 
     dequeue() {
-        return this.nodes.shift();
-    }
-
-    sort() {
-        this.nodes.sort((a, b) => a.priority - b.priority);
+        const min = this.heap[0];
+        const end = this.heap.pop();
+        
+        if (this.heap.length > 0) {
+            this.heap[0] = end;
+            this._sinkDown(0);
+        }
+        
+        return min;
     }
 
     isEmpty() {
-        return !this.nodes.length;
+        return this.heap.length === 0;
+    }
+
+    _bubbleUp(index) {
+        const element = this.heap[index];
+        
+        while (index > 0) {
+            const parentIndex = Math.floor((index - 1) / 2);
+            const parent = this.heap[parentIndex];
+            
+            if (element.priority >= parent.priority) break;
+            
+            this.heap[parentIndex] = element;
+            this.heap[index] = parent;
+            index = parentIndex;
+        }
+    }
+
+    _sinkDown(index) {
+        const length = this.heap.length;
+        const element = this.heap[index];
+        
+        while (true) {
+            const leftChildIndex = 2 * index + 1;
+            const rightChildIndex = 2 * index + 2;
+            let smallestChildIndex = null;
+            
+            if (leftChildIndex < length) {
+                if (this.heap[leftChildIndex].priority < element.priority) {
+                    smallestChildIndex = leftChildIndex;
+                }
+            }
+            
+            if (rightChildIndex < length) {
+                if (
+                    (smallestChildIndex === null && this.heap[rightChildIndex].priority < element.priority) ||
+                    (smallestChildIndex !== null && this.heap[rightChildIndex].priority < this.heap[leftChildIndex].priority)
+                ) {
+                    smallestChildIndex = rightChildIndex;
+                }
+            }
+            
+            if (smallestChildIndex === null) break;
+            
+            this.heap[index] = this.heap[smallestChildIndex];
+            this.heap[smallestChildIndex] = element;
+            index = smallestChildIndex;
+        }
     }
 }
 
@@ -384,42 +435,69 @@ function findClosestPoint(contours, point) {
 }
 
 
-function createGraphFromContours(contours) {
+function createGraphWithConnectionTypes(contours) {
     const graph = [];
+    const nodeMap = new Map(); // Map to quickly find nodes by coordinates
+    const MAX_JUMP_CONNECTIONS = 10; // Limit the number of jump connections per node
 
+    // Create nodes for each point in the contours
     contours.forEach(contour => {
         contour.forEach(pt => {
-            let node = graph.find(n => n.x === pt.x && n.y === pt.y);
-            if (!node) {
-                node = { x: pt.x, y: pt.y, neighbors: [] };
+            const key = `${pt.x},${pt.y}`;
+            if (!nodeMap.has(key)) {
+                const node = { x: pt.x, y: pt.y, neighbors: [] };
                 graph.push(node);
+                nodeMap.set(key, node);
             }
         });
     });
 
+    // Connect points within the same contour (regular path connections)
     contours.forEach(contour => {
         for (let i = 0; i < contour.length; i++) {
-            const node = graph.find(n => n.x === contour[i].x && n.y === contour[i].y);
+            const key = `${contour[i].x},${contour[i].y}`;
+            const node = nodeMap.get(key);
+            
             if (i > 0) {
-                const prevNode = graph.find(n => n.x === contour[i - 1].x && n.y === contour[i - 1].y);
-                if (!node.neighbors.includes(prevNode)) {
-                    node.neighbors.push(prevNode);
-                    prevNode.neighbors.push(node);
+                const prevKey = `${contour[i - 1].x},${contour[i - 1].y}`;
+                const prevNode = nodeMap.get(prevKey);
+                
+                if (!node.neighbors.some(neighbor => neighbor.node === prevNode)) {
+                    node.neighbors.push({ node: prevNode, isJump: false });
+                    prevNode.neighbors.push({ node: node, isJump: false });
                 }
             }
         }
     });
 
-    // Connect nodes from different contours within a small distance threshold
-    const threshold = 1;
+    // Create a spatial index for efficient nearest neighbor search
+    const spatialIndex = [];
     graph.forEach(node => {
-        graph.forEach(otherNode => {
-            if (node !== otherNode && !node.neighbors.includes(otherNode)) {
-                const distance = Math.hypot(node.x - otherNode.x, node.y - otherNode.y);
-                if (distance <= threshold) {
-                    node.neighbors.push(otherNode);
-                    otherNode.neighbors.push(node);
-                }
+        spatialIndex.push({
+            node: node,
+            x: node.x,
+            y: node.y
+        });
+    });
+
+    // Connect nodes from different contours with jump connections, but limit the number
+    graph.forEach(nodeA => {
+        // Sort other nodes by distance to current node
+        const distances = spatialIndex
+            .filter(item => item.node !== nodeA)
+            .map(item => ({
+                node: item.node,
+                distance: Math.hypot(nodeA.x - item.node.x, nodeA.y - item.node.y)
+            }))
+            .sort((a, b) => a.distance - b.distance);
+        
+        // Only connect to the closest MAX_JUMP_CONNECTIONS nodes
+        distances.slice(0, MAX_JUMP_CONNECTIONS).forEach(({ node: nodeB, distance }) => {
+            if (!nodeA.neighbors.some(neighbor => neighbor.node === nodeB)) {
+                nodeA.neighbors.push({ node: nodeB, isJump: true, jumpDistance: distance });
+            }
+            if (!nodeB.neighbors.some(neighbor => neighbor.node === nodeA)) {
+                nodeB.neighbors.push({ node: nodeA, isJump: true, jumpDistance: distance });
             }
         });
     });
@@ -429,36 +507,71 @@ function createGraphFromContours(contours) {
 
 
 function addStartEndToGraph(graph, start, end) {
-    let startIdx = graph.findIndex(pt => pt.x === start.x && pt.y === start.y);
-    if (startIdx === -1) {
-        startIdx = graph.length;
-        graph.push({ x: start.x, y: start.y, neighbors: [] });
+    const nodeMap = new Map();
+    const MAX_CONNECTIONS = 10; // Limit the number of connections from start/end points
+    
+    // Create a map for faster node lookups
+    graph.forEach((node, index) => {
+        nodeMap.set(`${node.x},${node.y}`, { node, index });
+    });
+    
+    // Check if start and end points already exist in the graph
+    const startKey = `${start.x},${start.y}`;
+    const endKey = `${end.x},${end.y}`;
+    
+    let startIdx = nodeMap.has(startKey) ? nodeMap.get(startKey).index : graph.length;
+    let endIdx = nodeMap.has(endKey) ? nodeMap.get(endKey).index : (startIdx === graph.length ? graph.length + 1 : graph.length);
+    
+    // Add start point if it doesn't exist
+    if (!nodeMap.has(startKey)) {
+        const startNode = { x: start.x, y: start.y, neighbors: [] };
+        graph.push(startNode);
+        nodeMap.set(startKey, { node: startNode, index: startIdx });
     }
-
-    let endIdx = graph.findIndex(pt => pt.x === end.x && pt.y === end.y);
-    if (endIdx === -1) {
-        endIdx = graph.length;
-        graph.push({ x: end.x, y: end.y, neighbors: [] });
+    
+    // Add end point if it doesn't exist
+    if (!nodeMap.has(endKey)) {
+        const endNode = { x: end.x, y: end.y, neighbors: [] };
+        graph.push(endNode);
+        nodeMap.set(endKey, { node: endNode, index: endIdx });
     }
-
-    // Connect start point to nearest nodes as jumps
+    
+    // Find the closest nodes to connect to start and end
+    const startNode = graph[startIdx];
+    const endNode = graph[endIdx];
+    
+    // Calculate distances from start to all other nodes
+    const startDistances = [];
     graph.forEach((node, idx) => {
         if (idx !== startIdx) {
-            const distanceToStart = Math.hypot(start.x - node.x, start.y - node.y);
-            graph[startIdx].neighbors.push({ node, isJump: true, jumpDistance: distanceToStart });
-            node.neighbors.push({ node: graph[startIdx], isJump: true, jumpDistance: distanceToStart });
+            const distance = Math.hypot(start.x - node.x, start.y - node.y);
+            startDistances.push({ node, idx, distance });
         }
     });
-
-    // Connect end point to nearest nodes as jumps
+    
+    // Sort by distance and connect only to the closest MAX_CONNECTIONS nodes
+    startDistances.sort((a, b) => a.distance - b.distance);
+    startDistances.slice(0, MAX_CONNECTIONS).forEach(({ node, idx, distance }) => {
+        startNode.neighbors.push({ node, isJump: true, jumpDistance: distance });
+        node.neighbors.push({ node: startNode, isJump: true, jumpDistance: distance });
+    });
+    
+    // Calculate distances from end to all other nodes
+    const endDistances = [];
     graph.forEach((node, idx) => {
         if (idx !== endIdx) {
-            const distanceToEnd = Math.hypot(end.x - node.x, end.y - node.y);
-            graph[endIdx].neighbors.push({ node, isJump: true, jumpDistance: distanceToEnd });
-            node.neighbors.push({ node: graph[endIdx], isJump: true, jumpDistance: distanceToEnd });
+            const distance = Math.hypot(end.x - node.x, end.y - node.y);
+            endDistances.push({ node, idx, distance });
         }
     });
-
+    
+    // Sort by distance and connect only to the closest MAX_CONNECTIONS nodes
+    endDistances.sort((a, b) => a.distance - b.distance);
+    endDistances.slice(0, MAX_CONNECTIONS).forEach(({ node, idx, distance }) => {
+        endNode.neighbors.push({ node, isJump: true, jumpDistance: distance });
+        node.neighbors.push({ node: endNode, isJump: true, jumpDistance: distance });
+    });
+    
     return { startIdx, endIdx };
 }
 
@@ -468,6 +581,12 @@ function dijkstraWithMinimalJumps(graph, startIdx, endIdx) {
     const previous = Array(graph.length).fill(null);
     const totalJumpDistances = Array(graph.length).fill(Infinity);
     const priorityQueue = new PriorityQueue();
+    const nodeIndices = new Map(); // Map to quickly find node indices
+    
+    // Create a map of node coordinates to indices for faster lookups
+    graph.forEach((node, index) => {
+        nodeIndices.set(`${node.x},${node.y}`, index);
+    });
 
     distances[startIdx] = 0;
     totalJumpDistances[startIdx] = 0;
@@ -480,7 +599,10 @@ function dijkstraWithMinimalJumps(graph, startIdx, endIdx) {
 
         const currentNode = graph[minDistanceNode];
         currentNode.neighbors.forEach(neighbor => {
-            const neighborIdx = graph.findIndex(pt => pt.x === neighbor.node.x && pt.y === neighbor.node.y);
+            // Use the map for faster node index lookup
+            const neighborKey = `${neighbor.node.x},${neighbor.node.y}`;
+            const neighborIdx = nodeIndices.get(neighborKey);
+            
             const jumpDistance = neighbor.isJump ? neighbor.jumpDistance : 0;
             const alt = distances[minDistanceNode] + Math.hypot(currentNode.x - neighbor.node.x, currentNode.y - neighbor.node.y);
             const totalJumpDist = totalJumpDistances[minDistanceNode] + jumpDistance;
@@ -492,7 +614,6 @@ function dijkstraWithMinimalJumps(graph, startIdx, endIdx) {
                 priorityQueue.enqueue(totalJumpDist, neighborIdx);
             }
         });
-
     }
 
     const path = [];
@@ -737,57 +858,9 @@ function removeConsecutiveDuplicates(points) {
 
 function findPathWithMinimalJumpDistances(contours, start, end) {
     const graph = createGraphWithConnectionTypes(contours);
-    const { startIdx, endIdx } = addStartEndToGraph(graph, start, end, start, end);
+    const { startIdx, endIdx } = addStartEndToGraph(graph, start, end);
     const path = dijkstraWithMinimalJumps(graph, startIdx, endIdx);
     return path;
-}
-
-
-function createGraphWithConnectionTypes(contours) {
-    const graph = [];
-
-    // Create nodes for each point in the contours
-    contours.forEach(contour => {
-        contour.forEach(pt => {
-            let node = graph.find(n => n.x === pt.x && n.y === pt.y);
-            if (!node) {
-                node = { x: pt.x, y: pt.y, neighbors: [] };
-                graph.push(node);
-            }
-        });
-    });
-
-    // Connect points within the same contour (regular path connections)
-    contours.forEach(contour => {
-        for (let i = 0; i < contour.length; i++) {
-            const node = graph.find(n => n.x === contour[i].x && n.y === contour[i].y);
-            if (i > 0) {
-                const prevNode = graph.find(n => n.x === contour[i - 1].x && n.y === contour[i - 1].y);
-                if (!node.neighbors.some(neighbor => neighbor.node === prevNode)) {
-                    node.neighbors.push({ node: prevNode, isJump: false });
-                    prevNode.neighbors.push({ node: node, isJump: false });
-                }
-            }
-        };
-    });
-
-    // Connect nodes from different contours with jump connections
-    for (let i = 0; i < graph.length; i++) {
-        for (let j = i + 1; j < graph.length; j++) {
-            const nodeA = graph[i];
-            const nodeB = graph[j];
-            const distance = Math.hypot(nodeA.x - nodeB.x, nodeA.y - nodeB.y);
-
-            if (!nodeA.neighbors.some(neighbor => neighbor.node === nodeB)) {
-                nodeA.neighbors.push({ node: nodeB, isJump: true, jumpDistance: distance });
-            }
-            if (!nodeB.neighbors.some(neighbor => neighbor.node === nodeA)) {
-                nodeB.neighbors.push({ node: nodeA, isJump: true, jumpDistance: distance });
-            }
-        }
-    }
-
-    return graph;
 }
 
 
