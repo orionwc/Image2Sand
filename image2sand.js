@@ -726,6 +726,57 @@ function deduplicateContours(contours, similarityThreshold = 0.5) {
     return uniqueContours;
 }
 
+// Function to interpolate points along a straight line
+function interpolatePoints(startPoint, endPoint, numPoints) {
+    if (numPoints <= 2) return [startPoint, endPoint];
+    
+    const points = [];
+    for (let i = 0; i < numPoints; i++) {
+        const t = i / (numPoints - 1);
+        const x = startPoint.x + t * (endPoint.x - startPoint.x);
+        const y = startPoint.y + t * (endPoint.y - startPoint.y);
+        points.push({ x, y });
+    }
+    return points;
+}
+
+// Function to calculate the distance between two points
+function distanceBetweenPoints(p1, p2) {
+    return Math.sqrt(Math.pow(p2.x - p1.x, 2) + Math.pow(p2.y - p1.y, 2));
+}
+
+// Function to add interpolated points to a contour based on segment length
+function addInterpolatedPoints(points, epsilon) {
+    if (points.length <= 1) return points;
+    
+    const result = [];
+    for (let i = 0; i < points.length - 1; i++) {
+        const startPoint = points[i];
+        const endPoint = points[i + 1];
+        
+        // Calculate distance between points
+        const distance = distanceBetweenPoints(startPoint, endPoint);
+        
+        // Determine how many points to add based on distance and epsilon
+        // For longer segments and smaller epsilon values, we want more points
+        // The smaller the epsilon, the more detailed the contour, so we add more points
+        const pointsToAdd = Math.max(2, Math.ceil(distance / (epsilon * 5)));
+        
+        // Add interpolated points for this segment
+        const interpolated = interpolatePoints(startPoint, endPoint, pointsToAdd);
+        
+        // Add all points except the last one (to avoid duplicates)
+        if (i < points.length - 2) {
+            result.push(...interpolated.slice(0, -1));
+        } else {
+            // For the last segment, include the end point
+            result.push(...interpolated);
+        }
+    }
+    
+    return result;
+}
+
 function getOrderedContours(edgeImage, initialEpsilon, retrievalMode, maxPoints) {
     const contours = new cv.MatVector(), hierarchy = new cv.Mat();
     cv.findContours(edgeImage, contours, hierarchy, retrievalMode, cv.CHAIN_APPROX_SIMPLE);
@@ -761,6 +812,10 @@ function getOrderedContours(edgeImage, initialEpsilon, retrievalMode, maxPoints)
                 if (isNearlyClosed(contour)) {  // Only close the contour if it's nearly closed
                     points = closeContour(points);
                 }
+                
+                // Add interpolated points along straight segments based on epsilon
+                points = addInterpolatedPoints(points, epsilon);
+                
                 if (isFullyClosed(points)) {
                     // Move starting point to nearest the center
                     points = reorderPointsForLoop(points);
@@ -768,8 +823,8 @@ function getOrderedContours(edgeImage, initialEpsilon, retrievalMode, maxPoints)
                 contourPoints.push(points);
                 totalPoints += points.length;
             }
-        }        
-
+        }
+        
         if (totalPoints > maxPoints) {
             let pointsOver = totalPoints - maxPoints;
             epsilon = adjustEpsilon(epsilon, pointsOver);
@@ -888,11 +943,16 @@ function generateDots(edgeImage) {
     const tracedContours = traceContours(orderedContours, isLoop, minimizeJumps);
     console.log('Traced: ', JSON.stringify(tracedContours));
 
-    plotContours(tracedContours);
-    // Save for future plotting
-    orderedContoursSave = tracedContours;
+    // Apply additional interpolation to the traced contours if needed
+    const interpolatedContours = tracedContours.map(contour => 
+        addInterpolatedPoints(contour, epsilon)
+    );
 
-    let orderedPoints = tracedContours.flat();
+    plotContours(interpolatedContours);
+    // Save for future plotting
+    orderedContoursSave = interpolatedContours;
+
+    let orderedPoints = interpolatedContours.flat();
 
     // Should always be the case for isLoop
     if (isFullyClosed(orderedPoints) || isLoop) {
