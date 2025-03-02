@@ -1006,7 +1006,7 @@ function WriteCoords(polarPoints, outputFormat = 0){
             formattedPolarPoints = polarPoints.map(p => {
                 // Subtract 900 (90 degrees) to rotate clockwise
                 const rotatedTheta = p.theta - 900;
-                return `${(rotatedTheta * Math.PI / 1800).toFixed(5)} ${(p.r / 1000).toFixed(5)}`;
+                return `${(-rotatedTheta * Math.PI / 1800).toFixed(5)} ${(p.r / 1000).toFixed(5)}`;
             }).join("\n");
             break;
 
