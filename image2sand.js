@@ -937,8 +937,9 @@ function WriteCoords(polarPoints, outputFormat = 0){
         case 2: //.thr
             // For .thr format, we keep the continuous theta values
             // Convert from tenths of degrees back to radians
+            // Negate theta again to fix the mirroring issue (cancels out the previous negation)
             formattedPolarPoints = polarPoints.map(p => 
-                `${(p.theta * Math.PI / 1800).toFixed(5)} ${(p.r / 1000).toFixed(5)}`
+                `${(-p.theta * Math.PI / 1800).toFixed(5)} ${(p.r / 1000).toFixed(5)}`
             ).join("\n");
             break;
 
