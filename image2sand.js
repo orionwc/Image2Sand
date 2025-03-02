@@ -813,8 +813,7 @@ function getOrderedContours(edgeImage, initialEpsilon, retrievalMode, maxPoints)
                     points = closeContour(points);
                 }
                 
-                // Add interpolated points along straight segments based on epsilon
-                points = addInterpolatedPoints(points, epsilon);
+                // We no longer interpolate points here - we'll do it later only if needed
                 
                 if (isFullyClosed(points)) {
                     // Move starting point to nearest the center
@@ -823,8 +822,8 @@ function getOrderedContours(edgeImage, initialEpsilon, retrievalMode, maxPoints)
                 contourPoints.push(points);
                 totalPoints += points.length;
             }
-        }
-        
+        }        
+
         if (totalPoints > maxPoints) {
             let pointsOver = totalPoints - maxPoints;
             epsilon = adjustEpsilon(epsilon, pointsOver);
@@ -943,16 +942,22 @@ function generateDots(edgeImage) {
     const tracedContours = traceContours(orderedContours, isLoop, minimizeJumps);
     console.log('Traced: ', JSON.stringify(tracedContours));
 
-    // Apply additional interpolation to the traced contours if needed
-    const interpolatedContours = tracedContours.map(contour => 
-        addInterpolatedPoints(contour, epsilon)
-    );
+    // Only apply additional interpolation if .thr format (format 2) is selected
+    let processedContours;
+    if (outputFormat === 2) {
+        // Apply interpolation for .thr format which needs more points for straight lines
+        processedContours = tracedContours.map(contour => 
+            addInterpolatedPoints(contour, epsilon)
+        );
+    } else {
+        processedContours = tracedContours;
+    }
 
-    plotContours(interpolatedContours);
+    plotContours(processedContours);
     // Save for future plotting
-    orderedContoursSave = interpolatedContours;
+    orderedContoursSave = processedContours;
 
-    let orderedPoints = interpolatedContours.flat();
+    let orderedPoints = processedContours.flat();
 
     // Should always be the case for isLoop
     if (isFullyClosed(orderedPoints) || isLoop) {
@@ -997,10 +1002,12 @@ function WriteCoords(polarPoints, outputFormat = 0){
         case 2: //.thr
             // For .thr format, we keep the continuous theta values
             // Convert from tenths of degrees back to radians
-            // Negate theta again to fix the mirroring issue (cancels out the previous negation)
-            formattedPolarPoints = polarPoints.map(p => 
-                `${(-p.theta * Math.PI / 1800).toFixed(5)} ${(p.r / 1000).toFixed(5)}`
-            ).join("\n");
+            // Apply a 90° clockwise rotation by subtracting π/2 (900 in tenths of degrees) from theta
+            formattedPolarPoints = polarPoints.map(p => {
+                // Subtract 900 (90 degrees) to rotate clockwise
+                const rotatedTheta = p.theta - 900;
+                return `${(rotatedTheta * Math.PI / 1800).toFixed(5)} ${(p.r / 1000).toFixed(5)}`;
+            }).join("\n");
             break;
 
         case 3: // whitespace (might cause problems as it outputs a space)
