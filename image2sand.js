@@ -813,8 +813,6 @@ function getOrderedContours(edgeImage, initialEpsilon, retrievalMode, maxPoints)
                     points = closeContour(points);
                 }
                 
-                // We no longer interpolate points here - we'll do it later only if needed
-                
                 if (isFullyClosed(points)) {
                     // Move starting point to nearest the center
                     points = reorderPointsForLoop(points);
