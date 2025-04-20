@@ -729,7 +729,7 @@ function deduplicateContours(contours, similarityThreshold = 0.5) {
 // Function to interpolate points along a straight line
 function interpolatePoints(startPoint, endPoint, numPoints) {
     if (numPoints <= 2) return [startPoint, endPoint];
-    
+
     const points = [];
     for (let i = 0; i < numPoints; i++) {
         const t = i / (numPoints - 1);
@@ -748,23 +748,23 @@ function distanceBetweenPoints(p1, p2) {
 // Function to add interpolated points to a contour based on segment length
 function addInterpolatedPoints(points, epsilon) {
     if (points.length <= 1) return points;
-    
+
     const result = [];
     for (let i = 0; i < points.length - 1; i++) {
         const startPoint = points[i];
         const endPoint = points[i + 1];
-        
+
         // Calculate distance between points
         const distance = distanceBetweenPoints(startPoint, endPoint);
-        
+
         // Determine how many points to add based on distance and epsilon
         // For longer segments and smaller epsilon values, we want more points
         // The smaller the epsilon, the more detailed the contour, so we add more points
         const pointsToAdd = Math.max(2, Math.ceil(distance / (epsilon * 5)));
-        
+
         // Add interpolated points for this segment
         const interpolated = interpolatePoints(startPoint, endPoint, pointsToAdd);
-        
+
         // Add all points except the last one (to avoid duplicates)
         if (i < points.length - 2) {
             result.push(...interpolated.slice(0, -1));
@@ -773,7 +773,7 @@ function addInterpolatedPoints(points, epsilon) {
             result.push(...interpolated);
         }
     }
-    
+
     return result;
 }
 
@@ -812,7 +812,7 @@ function getOrderedContours(edgeImage, initialEpsilon, retrievalMode, maxPoints)
                 if (isNearlyClosed(contour)) {  // Only close the contour if it's nearly closed
                     points = closeContour(points);
                 }
-                
+
                 if (isFullyClosed(points)) {
                     // Move starting point to nearest the center
                     points = reorderPointsForLoop(points);
