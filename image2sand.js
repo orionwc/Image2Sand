@@ -969,7 +969,25 @@ function generateDots(edgeImage) {
         orderedPoints = [...orderedPoints.slice(0,orderedPoints.length-1)];
     }
 
-    const polarPoints = drawDots(orderedPoints);
+    // Check if pen-up mode is enabled
+    const penUpEnabled = document.getElementById('pen-up-toggle').checked;
+    
+    // Debug logging
+    console.log('Pen-up enabled:', penUpEnabled);
+    console.log('Processed contours:', processedContours);
+    console.log('Number of contours:', processedContours ? processedContours.length : 'N/A');
+    
+    // For pen-up mode, we need to work with contours to identify boundaries
+    // For normal mode, we can work with the flattened orderedPoints
+    let polarPoints;
+    if (penUpEnabled) {
+        // Use contours to maintain structure for pen-up logic
+        polarPoints = drawDots(orderedPoints, true, processedContours);
+    } else {
+        // Use flattened points for normal processing
+        polarPoints = drawDots(orderedPoints);
+    }
+    
     WriteCoords(polarPoints, outputFormat);
     drawConnections(polarPoints);
     document.getElementById('total-points').innerText = `(${orderedPoints.length} Points)`;
@@ -1027,26 +1045,7 @@ function WriteCoords(polarPoints, outputFormat = 0){
 }
 
 
-function reorderPointsForLoop(points, startNear = calculateCentroid(points)) {
-    let minDist = Infinity;
-    let startIndex = 0;
-
-    // Find the point nearest to the centroid
-    points.forEach((point, index) => {
-        const dist = Math.hypot(point.x - startNear.x, point.y - startNear.y);
-        if (dist < minDist) {
-            minDist = dist;
-            startIndex = index;
-        }
-    });
-
-    // Reorder points to start from the point nearest to the centroid
-    return removeConsecutiveDuplicates([...points.slice(startIndex), ...points.slice(0, startIndex+1)]);
-    
-}
-
-
-function drawDots(points) {
+function drawDots(points, penUpEnabled = false, contours = null) {
     const canvas = document.getElementById('dot-image'), ctx = canvas.getContext('2d');
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -1055,19 +1054,83 @@ function drawDots(points) {
     const scaleY = height / originalImageElement.height;
     const scale = Math.min(scaleX, scaleY);
 
-    points = points.map(p => ({ x: (p.x) * scale, y: (p.y) * scale }));
+    let allPolarPoints = [];
+    
+    if (penUpEnabled && contours) {
+        // Pen-up mode: process contours individually to maintain structure
+        console.log('Processing contours in pen-up mode. Number of contours:', contours.length);
+        
+        // First, scale all points together to maintain coordinate relationships
+        const allScaledPoints = [];
+        for (let i = 0; i < contours.length; i++) {
+            const contour = contours[i];
+            console.log(`Processing contour ${i}:`, contour.length, 'points');
+            
+            // Scale the contour points for display
+            const scaledContour = contour.map(p => ({ 
+                x: (p.x) * scale, 
+                y: (p.y) * scale 
+            }));
+            
+            // Draw the scaled points
+            scaledContour.forEach(point => {
+                ctx.beginPath();
+                ctx.arc(point.x, point.y, 2, 0, 2 * Math.PI);
+                ctx.fill();
+            });
+            
+            allScaledPoints.push(...scaledContour);
+        }
+        
+        // Calculate polar coordinates for ALL points together (maintains relationships)
+        allPolarPoints = calculatePolarCoordinates(allScaledPoints);
+        console.log('Total polar points after processing:', allPolarPoints.length);
+        
+        // Now insert pen-up commands between contours
+        let currentIndex = 0;
+        for (let i = 0; i < contours.length - 1; i++) {
+            const contourLength = contours[i].length;
+            currentIndex += contourLength;
+            
+            // Insert pen-up (repeat the last coordinate of this contour)
+            const penUpPoint = allPolarPoints[currentIndex - 1];
+            allPolarPoints.splice(currentIndex, 0, penUpPoint);
+            console.log(`Added pen-up after contour ${i} at index ${currentIndex}`);
+            currentIndex++; // Account for the inserted point
+        }
+        
+        // If loop drawing is enabled, add a pen-up command at the end to return to start
+        const isLoopEnabled = document.getElementById('is-loop').checked;
+        if (isLoopEnabled) {
+            const lastPoint = allPolarPoints[allPolarPoints.length - 1];
+            allPolarPoints.push(lastPoint);
+            console.log('Added pen-up at end for loop drawing');
+        }
+        
+        console.log('Final total polar points with pen-up:', allPolarPoints.length);
+    } else {
+        // Normal mode: process flattened points
+        // Scale the points for display
+        const scaledPoints = points.map(p => ({ x: (p.x) * scale, y: (p.y) * scale }));
 
-    points.forEach(point => {
-        ctx.beginPath();
-        ctx.arc(point.x, point.y, 2, 0, 2 * Math.PI);
-        ctx.fill();
-    });
+        // Draw the scaled points
+        scaledPoints.forEach(point => {
+            ctx.beginPath();
+            ctx.arc(point.x, point.y, 2, 0, 2 * Math.PI);
+            ctx.fill();
+        });
 
-    const formattedPoints = points.map(p => `{${p.x.toFixed(2)}, ${p.y.toFixed(2)}}`).join(',\n');
+        // Calculate polar coordinates using the helper function
+        allPolarPoints = calculatePolarCoordinates(scaledPoints);
+    }
+    
+    return allPolarPoints;
+}
 
+
+function calculatePolarCoordinates(points) {
     // Calculate polar coordinates
     const center = findMaximalCenter(points);
-
     points = points.map(p => ({ x: p.x - center.centerX, y: p.y - center.centerY }));
     
     // Calculate initial angles for all points
@@ -1112,8 +1175,26 @@ function drawDots(points) {
         r: p.r,
         theta: p.theta * (1800 / Math.PI) // Convert radians to tenths of degrees
     }));
-
+    
     return polarPoints;
+}
+
+
+function reorderPointsForLoop(points, startNear = calculateCentroid(points)) {
+    let minDist = Infinity;
+    let startIndex = 0;
+
+    // Find the point nearest to the centroid
+    points.forEach((point, index) => {
+        const dist = Math.hypot(point.x - startNear.x, point.y - startNear.y);
+        if (dist < minDist) {
+            minDist = dist;
+            startIndex = index;
+        }
+    });
+
+    // Reorder points to start from the point nearest to the centroid
+    return removeConsecutiveDuplicates([...points.slice(startIndex), ...points.slice(0, startIndex+1)]);
 }
 
 
@@ -1202,15 +1283,16 @@ function drawConnections(polarPoints) {
     ctx.strokeStyle = 'black';
     ctx.stroke();
 
-    // Draw the connections based on polar coordinates
-    for (let i = 0; i < polarPoints.length - 1; i++) {
-        // Calculate the color for each segment
-        const t = i / (polarPoints.length - 1);
-        const color = `hsl(${t * 270}, 100%, 50%)`; // 270 degrees covers red to violet
-        ctx.strokeStyle = color;
+    // Check if pen-up mode is enabled
+    const penUpEnabled = document.getElementById('pen-up-toggle').checked;
 
+    // Draw the connections based on polar coordinates
+    console.log('Drawing connections for', polarPoints.length, 'points');
+    for (let i = 0; i < polarPoints.length - 1; i++) {
         const p1 = polarPoints[i];
         const p2 = polarPoints[i + 1];
+        
+        console.log(`Segment ${i}:`, p1, '->', p2);
 
         // Convert from tenths of degrees to radians for visualization
         const theta1 = p1.theta * Math.PI / 1800;
@@ -1221,6 +1303,70 @@ function drawConnections(polarPoints) {
         const y1 = -p1.r * Math.sin(theta1) * scale;
         const x2 = p2.r * Math.cos(theta2) * scale;
         const y2 = -p2.r * Math.sin(theta2) * scale;
+
+        // Determine if this is a pen-up section (repeated coordinates)
+        let isPenUp = false;
+        let shouldDrawLightGrey = false;
+        if (penUpEnabled) {
+            // For pen-up mode, we'll use a simple heuristic: 
+            // if coordinates are repeated (same r and theta), it's a pen-up section
+            // Add small tolerance for floating point precision
+            const tolerance = 0.1;
+            isPenUp = (Math.abs(p1.r - p2.r) < tolerance && Math.abs(p1.theta - p2.theta) < tolerance);
+            if (isPenUp) {
+                console.log(`Pen-up detected at segment ${i}:`, p1, p2);
+                console.log(`Skipping line between repeated coordinates`);
+                continue; // Skip drawing this line entirely
+            }
+            
+            // Check if the previous segment was a pen-up (repeated coordinates)
+            // If so, draw this line in light grey
+            if (i > 0) {
+                const prevP1 = polarPoints[i-1];
+                const prevP2 = polarPoints[i];
+                const prevIsPenUp = (Math.abs(prevP1.r - prevP2.r) < tolerance && Math.abs(prevP1.theta - prevP2.theta) < tolerance);
+                if (prevIsPenUp) {
+                    shouldDrawLightGrey = true;
+                    console.log(`Drawing light grey line from pen-up to next coordinate`);
+                }
+            }
+        }
+
+        // Set color based on pen state
+        if (shouldDrawLightGrey) {
+            ctx.strokeStyle = '#D3D3D3'; // Light grey for pen-up sections
+            ctx.lineWidth = 1; // Thinner line for pen-up
+        } else {
+            // Calculate the color for each segment, but skip pen-up segments for gradient
+            // Count only the real drawing segments (excluding pen-up segments)
+            let realSegmentIndex = 0;
+            for (let j = 0; j < i; j++) {
+                const jP1 = polarPoints[j];
+                const jP2 = polarPoints[j + 1];
+                const jTolerance = 0.1;
+                const jIsPenUp = (Math.abs(jP1.r - jP2.r) < jTolerance && Math.abs(jP1.theta - jP2.theta) < jTolerance);
+                if (!jIsPenUp) {
+                    realSegmentIndex++;
+                }
+            }
+            
+            // Calculate total real segments for gradient
+            let totalRealSegments = 0;
+            for (let j = 0; j < polarPoints.length - 1; j++) {
+                const jP1 = polarPoints[j];
+                const jP2 = polarPoints[j + 1];
+                const jTolerance = 0.1;
+                const jIsPenUp = (Math.abs(jP1.r - jP2.r) < jTolerance && Math.abs(jP1.theta - jP2.theta) < jTolerance);
+                if (!jIsPenUp) {
+                    totalRealSegments++;
+                }
+            }
+            
+            // Calculate the color for this real segment
+            const t = realSegmentIndex / Math.max(1, totalRealSegments - 1);
+            ctx.strokeStyle = `hsl(${t * 270}, 100%, 50%)`; // 270 degrees covers red to violet
+            ctx.lineWidth = 2; // Normal line width for pen-down sections
+        }
 
         ctx.beginPath();
         ctx.moveTo(x1, y1);
@@ -1282,6 +1428,30 @@ document.addEventListener('DOMContentLoaded', function() {
     const dotNumberInput = document.getElementById('dot-number');
     const contourModeSelect = document.getElementById('contour-mode');
     //const gaussianBlurToggle = document.getElementById('gaussian-blur-toggle');
+
+    // Add event listeners for incompatible options
+    const noShortcutsCheckbox = document.getElementById('no-shortcuts');
+    const penUpToggleCheckbox = document.getElementById('pen-up-toggle');
+
+    // Function to handle incompatible options
+    function handleIncompatibleOptions() {
+        if (noShortcutsCheckbox.checked && penUpToggleCheckbox.checked) {
+            // If both are checked, uncheck the one that wasn't just clicked
+            if (this === noShortcutsCheckbox) {
+                penUpToggleCheckbox.checked = false;
+            } else {
+                noShortcutsCheckbox.checked = false;
+            }
+        }
+        
+        // Update disabled states
+        noShortcutsCheckbox.disabled = penUpToggleCheckbox.checked;
+        penUpToggleCheckbox.disabled = noShortcutsCheckbox.checked;
+    }
+
+    // Add event listeners
+    noShortcutsCheckbox.addEventListener('change', handleIncompatibleOptions);
+    penUpToggleCheckbox.addEventListener('change', handleIncompatibleOptions);
 
     document.getElementById('plotButton').addEventListener('click', plotNextContour);
 
