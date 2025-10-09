@@ -17,7 +17,10 @@ import pyttsx3
 # ------------------------------------------------------------------------------------------------------------------------------------------------------
 # IMPORTANT: Insert your OpenAI API key here. It will need be to given permission for DALL-E-2 and DALL-E-3 models.
 # IMPORTANT: Set the COM ports to the one connected  to the Sand Garden
+apikey = "" # Your OpenAI API Key
+comport = "COM4" # The port used to connect to the Sand Garden. You can find this at the top of the HackPack IDE to the left of the RESTORE CODE button.
 # ------------------------------------------------------------------------------------------------------------------------------------------------------
+webpage = "https://orionwc.github.io/Image2Sand/"
 
 #
 # This program will listen for you to say a phrase containing the word "Draw" and then use what's after that as the prompt for the Image2Sand website.
@@ -135,10 +138,6 @@ def DrawPattern(pattern, isFirst):
     plot_pattern_incrementally(fig, ax, colors, r_values, theta_values)
     plt.ioff()
     
-    # Send END signal to indicate pattern completion
-    print("Sending END signal...")
-    printSerial("<END>")
-    print("Pattern complete!")
 
 def real_time_transcription():
     recognizer = sr.Recognizer()
@@ -170,6 +169,7 @@ def real_time_transcription():
                         pattern = ""
 
                         # Send the Prompt to the Image2Sand website along with the API Key
+                        coord_url = webpage + "?apikey=" + apikey + "&run=1&prompt=" + urllib.parse.quote(instructions)
                         print("Requesting response from " + coord_url)
                         driver.get(coord_url)
 
