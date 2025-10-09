@@ -1387,7 +1387,8 @@ function getUrlParams() {
     return {
         apikey: params.get('apikey'),
         prompt: params.get('prompt'),
-        run: params.get('run')
+        run: params.get('run'),
+        penup: params.get('penup')
     };
 }
 
@@ -1399,6 +1400,9 @@ function fillInputsFromParams(params) {
     }
     if (params.prompt) {
         document.getElementById('prompt').value = params.prompt;
+    }
+    if (params.penup) {
+        document.getElementById('pen-up-toggle').checked = true;
     }
 }
 
@@ -1484,10 +1488,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // Initialize the page with URL parameters if present
 document.addEventListener('DOMContentLoaded', (event) => {
-    const { apikey, prompt, run } = getUrlParams();
+    const { apikey, prompt, run, penup } = getUrlParams();
 
     // Fill inputs with URL parameters if they exist
-    fillInputsFromParams({ apikey, prompt });
+    fillInputsFromParams({ apikey, prompt, penup });
     if (apikey) {  
         document.getElementById('api-key-group').style.display = 'none'; 
     }
