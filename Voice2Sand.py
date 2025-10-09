@@ -137,7 +137,12 @@ def DrawPattern(pattern, isFirst):
     # Ensure the last segment is plotted
     plot_pattern_incrementally(fig, ax, colors, r_values, theta_values)
     plt.ioff()
-    
+
+    # Send END signal to indicate pattern completion
+    print("Sending END signal...")
+    printSerial("<END>")
+    #waitTillReceived("END_RECEIVED")
+    print("Pattern complete!")
 
 def real_time_transcription():
     recognizer = sr.Recognizer()
