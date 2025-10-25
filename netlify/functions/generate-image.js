@@ -1,14 +1,16 @@
 exports.handler = async (event, context) => {
+  // Set CORS headers for all responses
+  const corsHeaders = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS'
+  };
+
   // Handle CORS preflight requests
   if (event.httpMethod === 'OPTIONS') {
     return {
       statusCode: 200,
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'Content-Type',
-        'Access-Control-Allow-Methods': 'POST, OPTIONS',
-        'Access-Control-Max-Age': '86400'
-      },
+      headers: corsHeaders,
       body: ''
     };
   }
@@ -18,6 +20,7 @@ exports.handler = async (event, context) => {
     console.log('Method not allowed:', event.httpMethod);
     return {
       statusCode: 405,
+      headers: corsHeaders,
       body: JSON.stringify({ error: 'Method not allowed', received: event.httpMethod })
     };
   }
@@ -32,6 +35,7 @@ exports.handler = async (event, context) => {
     if (!prompt) {
       return {
         statusCode: 400,
+        headers: corsHeaders,
         body: JSON.stringify({ error: 'Prompt is required' })
       };
     }
@@ -42,6 +46,7 @@ exports.handler = async (event, context) => {
     if (!apiKey) {
       return {
         statusCode: 500,
+        headers: corsHeaders,
         body: JSON.stringify({ error: 'API key not configured' })
       };
     }
@@ -81,11 +86,8 @@ exports.handler = async (event, context) => {
     return {
       statusCode: 200,
       headers: {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'Content-Type',
-        'Access-Control-Allow-Methods': 'POST, OPTIONS',
-        'Access-Control-Max-Age': '86400'
+        ...corsHeaders,
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify(data)
     };
@@ -94,11 +96,7 @@ exports.handler = async (event, context) => {
     console.error('Function error:', error);
     return {
       statusCode: 500,
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'Content-Type',
-        'Access-Control-Allow-Methods': 'POST, OPTIONS'
-      },
+      headers: corsHeaders,
       body: JSON.stringify({ error: 'Internal server error' })
     };
   }
