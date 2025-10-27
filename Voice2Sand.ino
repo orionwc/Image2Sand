@@ -202,8 +202,8 @@ These flags are used in that state machine.
 */
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-int currentPattern = 1;           //default to pattern 1.
-bool runPattern = false;          //this will be the start/stop flag. true means run the selected pattern.
+int currentPattern = 11;           //default to pattern 11 (pattern_Remote).
+bool runPattern = true;            //this will be the start/stop flag. true means run the selected pattern.
 bool buttonShortPressed = false;  //button pressed state flag.
 bool buttonLongPressed = false;   //for indicating long press
 bool autoMode = true;             //tracking if we're in automatic or manual mode. Defaults to auto on startup. If you want to start in manual drawing mode, set this to false.
@@ -2017,8 +2017,13 @@ Positions pattern_Remote(Positions current, bool restartPattern = false) {
       if (receivedString != nullptr) {
         Serial.println(receivedString);
 
+        // Check if receivedString contains "START" - handle restart mid-drawing
+        if (strcmp(receivedString, "START") == 0) {
+            Serial.println("READY");
+            // Continue waiting for POS: message
+        }
         // Check if receivedString contains "POS:"
-        if (strncmp(receivedString, "POS:", 4) == 0) {
+        else if (strncmp(receivedString, "POS:", 4) == 0) {
             sscanf(receivedString + 4, "%d,%d", &r, &theta);
             endPos = {r, theta};
             done = true;
