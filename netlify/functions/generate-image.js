@@ -17,7 +17,6 @@ exports.handler = async (event, context) => {
 
   // Only allow POST requests
   if (event.httpMethod !== 'POST') {
-    console.log('Method not allowed:', event.httpMethod);
     return {
       statusCode: 405,
       headers: corsHeaders,
@@ -26,11 +25,8 @@ exports.handler = async (event, context) => {
   }
 
   try {
-    console.log('Function called with:', { method: event.httpMethod, body: event.body });
-    
     // Parse the request body
     const { prompt } = JSON.parse(event.body);
-    console.log('Parsed prompt:', prompt);
     
     if (!prompt) {
       return {
