@@ -26,7 +26,7 @@ SOFTWARE.
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Image 2 Sand</title>
+    <title>Image2Sand</title>
     
     <!-- Google Tag Manager -->
     <script>
@@ -48,11 +48,12 @@ SOFTWARE.
     </script>
     
     <link rel="stylesheet" href="styles.css">
-    <meta charset="UTF-8">
-    <title>Image 2 Sand</title>
     <script async src="https://docs.opencv.org/4.5.0/opencv.js"></script>
+    <script src="image2sand-core.js"></script>
     <script src="image2path.js"></script>
+    <script src="voice2sand.js"></script>
     <script src="image2sand.js"></script>
+    <script src="magic.js"></script>
 </head>
 
 <body>
@@ -61,57 +62,313 @@ SOFTWARE.
     height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
     <!-- End Google Tag Manager (noscript) -->
 
-    <div class="container" id="master-container">
-        <div class="grid">
-            <div class="grid-item span-full-width">
-                <h1 class="page-title">Image 2 Sand</h1>
-                <p><small>To learn more about what this site is for, watch <a href="https://youtu.be/fOfYCiM7BC8">this video</a>.</small></p>
+    <!-- Header -->
+    <header class="main-header">
+        <h1 class="main-title">Image2Sand</h1>
+    </header>
+
+    <!-- Tab Navigation -->
+    <nav class="tab-navigation">
+        <button class="tab-button" data-tab="introduction">Introduction</button>
+        <button class="tab-button active" data-tab="guided">Create Sand Art</button>
+        <div class="magic-mode-toggle">
+            <label class="toggle-switch" title="Magic Mode">
+                <input type="checkbox" id="magic-mode-toggle" onchange="toggleMagicMode()">
+                <span class="toggle-slider">
+                    <span class="toggle-label">✨</span>
+                </span>
+            </label>
+        </div>
+    </nav>
+
+    <!-- Main Content Container -->
+    <div class="main-container">
+        
+        <!-- Introduction Tab -->
+        <div id="introduction" class="tab-content">
+            <!-- Context Panel -->
+            <div class="context-panel">
+                <p>Transform your images into sand art patterns or create drawings using voice commands. Watch the video below and try it for yourself.</p>
             </div>
-            <div class="grid-item">
-                <div>
-                    <input type="radio" id="uploadTab" name="tab" checked onchange="showTab('upload')">
-                    <label for="uploadTab" class="tab">Upload an Image</label>
-                    <input type="radio" id="generateTab" name="tab" onchange="showTab('generate')">
-                    <label for="generateTab" class="tab">Generate an Image</label>
+            <div class="intro-grid">
+                <div class="video-section">
+                    <h3>Draw any Image</h3>
+                    <iframe width="100%" height="315" src="https://www.youtube.com/embed/fOfYCiM7BC8?rel=0" frameborder="0" allowfullscreen></iframe>
+                    <button class="mode-button" onclick="switchToTab('guided'); document.getElementById('pen-up-toggle').checked = false;">
+                        Upload an Image
+                    </button>
+                </div>
+                <div class="video-section">
+                    <h3>Draw by Voice</h3>
+                    <iframe width="100%" height="315" src="https://www.youtube.com/embed/AUMiR996WdU?rel=0" frameborder="0" allowfullscreen></iframe>
+                    <button class="mode-button" onclick="switchToTab('guided'); document.getElementById('magic-mode-toggle').checked = true; toggleMagicMode(); document.getElementById('pen-up-toggle').checked = false;">
+                        Try Magic Mode
+                    </button>
+                </div>
+            </div>
+            <div class="referral-section" style="margin-bottom: 2rem;">
+                <div class="referral-box">
+                    <h4>Want to get the HackPack to try this out?</h4>
+                    <a href="https://go.referralcandy.com/share/P453PVX?s=rp&t=cp" target="_blank" class="referral-link">
+                        Use this link for 💵 $10 off your first box
+                    </a>
+                    <p class="compatibility-note">Also works with the <a href="https://github.com/tuanchris/dune-weaver?tab=readme-ov-file" target="_blank" class="dune-weaver-link">DuneWeaver</a> Sand Tables</p>
+                </div>
+            </div>
+            <div class="intro-grid">
+                <div class="video-section">
+                    <h3>Now works with the String Plotter too</h3>
+                    <iframe width="100%" height="315" src="https://www.youtube.com/embed/Ba969sJ4UOo?rel=0" frameborder="0" allowfullscreen></iframe>
+                    <button class="mode-button" onclick="switchToTab('guided'); document.getElementById('pen-up-toggle').checked = true;">
+                        Try with Pen support
+                    </button>
+                </div>
+            </div>
                 </div>
             
-                <div id="frame">
-                    <div id="upload" class="tab-content" style="display: block;">
-                        <div class="file-input-group">
+        <!-- Guided Mode Tab -->
+        <div id="guided" class="tab-content active">
+            
+            <!-- Magic Mode Stage Indicators (only visible in Magic Mode) -->
+            <div class="voice-stage-indicators hidden" id="magic-stage-indicators">
+                <div class="stage-indicator" id="magic-listen-stage">
+                    <span class="stage-label">Listen</span>
+                </div>
+                <div class="stage-indicator" id="magic-generate-stage">
+                    <span class="stage-label">Generate</span>
+                </div>
+                <div class="stage-indicator" id="magic-convert-stage">
+                    <span class="stage-label">Convert</span>
+                </div>
+                <div class="stage-indicator" id="magic-stream-stage">
+                    <span class="stage-label">Stream</span>
+                </div>
+            </div>
+            
+            <!-- Prerequisites Warning Modal (only visible in Magic Mode when prerequisites not met) -->
+            <div class="prerequisites-warning" id="prerequisites-warning" style="display: none;">
+                <div class="warning-content">
+                    <span class="warning-icon">⚠️</span>
+                    <div class="warning-text">
+                        <strong>Prerequisites Required:</strong>
+                        <span id="warning-message">Please enter your OpenAI API key and connect to Serial port before launching Magic Mode.</span>
+                    </div>
+                    <button id="prerequisites-connect-serial" class="primary-button" style="display: none;">Connect to Serial Port</button>
+                </div>
+            </div>
+            
+            <!-- API Error Display -->
+            <div class="api-error-warning" id="api-error-warning" style="display: none;">
+                <div class="warning-content">
+                    <span class="warning-icon">❌</span>
+                    <div class="warning-text">
+                        <strong>API Error:</strong>
+                        <span id="api-error-message">An error occurred while generating the image.</span>
+                    </div>
+                    <button id="dismiss-api-error" class="primary-button">Dismiss</button>
+                </div>
+            </div>
+            
+            <!-- Magic Panel (only visible in Magic Mode) -->
+            <div class="magic-panel" id="magic-panel" style="display: none;">
+                <div class="magic-content">
+                    <!-- Voice State -->
+                    <div class="magic-state" id="magic-voice-state">
+                        <!-- GO Button -->
+                        <button class="magic-go-button" id="magic-go-button">
+                            <span class="button-text">GO</span>
+                        </button>
+                        
+                        <!-- Voice Input Container -->
+                        <div class="voice-input-container">
+                            <!-- FFT Display -->
+                            <div class="fft-container">
+                                <canvas id="magic-fft-canvas" width="800" height="200" title="FFT Canvas - Opacity: 0.5"></canvas>
+                            </div>
+                            
+                            <!-- Text Elements -->
+                            <div class="voice-text-container">
+                                <!-- Transcription Display -->
+                                <div class="transcription-display" id="magic-transcription" title="Transcription - Opacity: 0.5">Waiting for voice input...</div>
+                                
+                                <!-- Voice Instructions -->
+                                <div class="voice-instructions">Say "Draw [what you want it to draw]"</div>
+                            </div>
+                        </div>
+                        
+                        <!-- Object Highlight (moved outside voice-input-container) -->
+                        <div class="object-highlight" id="magic-object-highlight" title="Object Highlight - Opacity: 0.5"></div>
+                        
+                        
+                        <!-- Conversion Sequence -->
+                        <div class="conversion-sequence">
+                            <div class="conversion-box" id="magic-original-box">
+                                <canvas id="magic-original-canvas" class="magic-conversion-canvas"></canvas>
+                            </div>
+                            <div class="conversion-arrow" id="magic-arrow-1">→</div>
+                            <div class="conversion-box" id="magic-edges-box">
+                                <canvas id="magic-edges-canvas" class="magic-conversion-canvas"></canvas>
+                            </div>
+                            <div class="conversion-arrow" id="magic-arrow-2">→</div>
+                            <div class="conversion-box" id="magic-dots-box">
+                                <canvas id="magic-dots-canvas" class="magic-conversion-canvas"></canvas>
+                            </div>
+                            <div class="conversion-arrow" id="magic-arrow-3">→</div>
+                            <div class="conversion-box" id="magic-pattern-box">
+                                <canvas id="magic-pattern-canvas" class="magic-conversion-canvas"></canvas>
+                            </div>
+                        </div>
+                        
+                        <!-- Streaming Progress Indicator -->
+                        <div class="streaming-progress-container">
+                            <div class="streaming-progress-bar">
+                                <div class="streaming-progress-fill" id="streaming-progress-fill"></div>
+                                <div class="streaming-progress-text" id="streaming-progress-text">Streaming</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- See Details Button -->
+                <button class="magic-details-button" id="magic-details-button">
+                    <span>See Details</span>
+                    <span class="toggle-icon">▼</span>
+                </button>
+            </div>
+            
+            <div class="panel-grid">
+                <!-- Input Panel -->
+                <div class="panel input-panel">
+                    <h3>What should we draw?</h3>
+                    <div class="input-modes">
+                        <div class="input-mode-selector">
+                            <input type="radio" id="upload-mode" name="input-mode" value="upload" checked>
+                            <label for="upload-mode">Upload</label>
+                            <input type="radio" id="generate-mode" name="input-mode" value="generate">
+                            <label for="generate-mode">Generate</label>
+                            <input type="radio" id="coordinates-mode" name="input-mode" value="coordinates">
+                            <label for="coordinates-mode">Coordinates</label>
+                        </div>
+                        
+                        <!-- Upload Mode -->
+                        <div id="upload-input" class="input-content">
+                            <div class="drag-drop-zone" id="drag-drop-zone">
                             <input type="file" id="file-input" style="display: none;" accept="image/*">
-                            <button id="file-button"><img src="open-file-icon.png" alt="Open File" style="width: 20px; height: 20px;"></button>
-                            <span id="file-name">No file selected</span>
+                                <div class="drop-zone-content">
+                                    <div style="font-size: 40px; margin-bottom: 1rem;">🖼️</div>
+                                    <p>Click to select an image or drag and drop here</p>
+                                    <span id="file-name" class="file-name-display">No file selected</span>
+                                </div>
                         </div>
                     </div>
             
-                    <div id="generate" class="tab-content" style="display: none;">
-                        <div class="input-group" id="api-key-group">
+                        <!-- Generate Mode -->
+                        <div id="generate-input" class="input-content" style="display: none;">
+                            <!-- API key input removed - now handled by Netlify function -->
+                            <div class="input-group" style="display: none;">
                             <label for="api-key">OpenAI API Key:</label>
                             <input type="text" id="api-key" placeholder="Enter a valid OpenAI API key">
                         </div>
+                            
+                            <!-- Prompt Input Modes -->
+                            <div class="prompt-input-modes">
+                                <div class="prompt-mode-selector">
+                                    <input type="radio" id="text-prompt-mode" name="prompt-input-mode" value="text" checked>
+                                    <label for="text-prompt-mode">Text</label>
+                                    <input type="radio" id="voice-prompt-mode" name="prompt-input-mode" value="voice">
+                                    <label for="voice-prompt-mode">Voice</label>
+                                </div>
+                                
+                                <!-- Text Prompt Mode -->
+                                <div id="text-prompt-input" class="prompt-input-content">
+                                    <!-- Text mode has no additional controls above the prompt -->
+                                </div>
+                                
+                                <!-- Voice Prompt Mode -->
+                                <div id="voice-prompt-input" class="prompt-input-content" style="display: none;">
+                                    <div class="voice-prompt-controls">
+                                        <button id="manual-voice-button" class="voice-button">
+                                            <span class="button-icon">🎤</span>
+                                            <span class="button-text">Ask by Voice</span>
+                                            <span class="button-subtext" style="display: none;">Click to cancel</span>
+                                        </button>
+                                        <div class="speech-indicator">
+                                            <div id="manual-speech-dot" class="status-dot"></div>
+                                            <span id="manual-speech-status">Not listening</span>
+                                        </div>
+                                    </div>
+                                    <div class="voice-prompt-status">
+                                        <div class="voice-status-labels">
+                                            <h4>Live Transcript:</h4>
+                                            <h4>Confidence:</h4>
+                                        </div>
+                                        <div class="voice-status-content">
+                                            <div class="transcript-display">
+                                                <div id="manual-live-transcript" class="transcript-text">Waiting for speech...</div>
+                                            </div>
+                                            <div class="confidence-display">
+                                                <div class="confidence-bar">
+                                                    <div id="manual-confidence-fill" class="confidence-fill"></div>
+                                                </div>
+                                                <span id="manual-confidence-text">0%</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="detected-object" style="display: none;">
+                                        <h4>Detected Object:</h4>
+                                        <div id="manual-detected-object" class="object-display">No object detected yet...</div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Single Prompt Input (always visible) -->
                         <div class="input-group">
                             <label for="prompt">Image Prompt:</label>
-                            <input type="text" id="prompt" placeholder="What do you want to draw?" maxlength="500">
+                                    <input type="text" id="prompt" placeholder="What do you want to draw?" maxlength="500" class="voice-prompt-input">
                             <div class="checkbox-container">
                                 <input type="checkbox" id="googly-eyes" name="googly-eyes">
                                 <label for="googly-eyes">Add googly eyes</label>
                             </div>
-                            <button id="gen-image-button">Create</button>
+                                    <button id="gen-image-button" class="primary-button">Create</button>
+                                </div>
                         </div>
+                            
                         <label id="generation-status" style="display: none;">Image is generating - please wait...</label>
                     </div>
                                       
+                        <!-- Coordinates Mode -->
+                        <div id="coordinates-input" class="input-content" style="display: none;">
+                            <div class="input-group">
+                                <label for="coordinates-text">Paste Coordinates:</label>
+                                <textarea id="coordinates-text" placeholder="Paste coordinates here..."></textarea>
+                            </div>
+                            <button id="continue-coordinates-button" class="primary-button" style="display: none;">Continue</button>
+                        </div>
+                    </div>
                 </div>
-                <div><button id="generate-button">Generate Coordinates</button>
-                <label id="processing-status" style="display: none;">Image is processing - please wait...</label>
+
+                <!-- Image Panel -->
+                <div class="panel image-panel">
+                    <h3>Source Image</h3>
+                    <div class="image-container">
+                        <canvas id="original-image"></canvas>
+                        <div class="image-placeholder" id="image-placeholder">
+                            <p>No image selected</p>
                 </div>
             </div>
-            <div class="grid-item">
+                    <button id="generate-button" class="primary-button" style="display: none;">Generate Pattern</button>
+                    
+                    <!-- Collapsible Settings -->
+                    <div class="settings-section">
+                        <button class="settings-toggle" onclick="toggleSettings()">
+                            <span>Settings</span>
+                            <span class="toggle-icon">▼</span>
+                        </button>
+                        <div class="settings-content" id="settings-content" style="display: none;">
                 <div class="settings-grid">
                     <div class="settings-left">
                         <div class="slider-container">
-                            <input type="range" id="epsilon-slider" min="0.1" max="20" step="0.1" value="2" style="width: 100%;" title="Adjust the granularity with which the shapes are drawn - Fine (smaller) means more points and could be much slower to compute">
-                            <span id="epsilon-value-display">2</span>
+                            <input type="range" id="epsilon-slider" min="0.1" max="20" step="0.1" value="1" style="width: 100%;" title="Adjust the granularity with which the shapes are drawn - Fine (smaller) means more points and could be much slower to compute">
+                            <span id="epsilon-value-display">1.0</span>
                             <div class="slider-labels">
                                 <small>Fine</small>
                                 <small>Coarse</small>
@@ -130,9 +387,10 @@ SOFTWARE.
                                 <option value="100">100</option>
                                 <option value="200" selected>200</option>
                                 <option value="300">300</option>
-                                <option value="500" title="(experimental)">400</option>
+                                <option value="400" title="(experimental)">400</option>
                                 <option value="500" title="(experimental)">500</option>
                                 <option value="1000" title="(experimental)">1000</option>
+                                <option value="2000" title="(experimental)">2000</option>
                             </select>
                         </div>
                     </div>
@@ -152,7 +410,7 @@ SOFTWARE.
                         </div>
                         <div class="checkbox-container">
                             <label for="no-shortcuts" title="Discourage shortcuts between contours - Draws cleaner image but takes more points and more time to generate.">No Shortcuts (experimental)</label>
-                            <input type="checkbox" id="no-shortcuts" name="no-shortcuts">
+                            <input type="checkbox" id="no-shortcuts" name="no-shortcuts" checked>
                         </div>
                         <div class="checkbox-container">
                             <label for="pen-up-toggle" title="Repeats the prior coordinate to indicate the need to lift the pen/marble. This will provide a better representation of the image when lifting the drawing element is possible.">Repeat Coordinate for PenUp</label>
@@ -161,46 +419,103 @@ SOFTWARE.
                     </div>
                 </div>
             </div>
-            <div class="grid-item">
-                <h4>Original Image</h4>
-                <canvas id="original-image"></canvas>
+                    </div>
+                </div>
+
+                <!-- Patternification Panel (2 panels wide) -->
+                <div class="panel patternification-panel span-two-panels" style="display: none;">
+                    <h3>Image Conversion</h3>
+                    <div class="patternification-flow">
+                        <div class="pattern-step">
+                            <h4>Original</h4>
+                            <canvas id="original-pattern"></canvas>
             </div>
-            <div class="grid-item">
-                <h4>Detected Edges</h4>
+                        <div class="arrow">→</div>
+                        <div class="pattern-step">
+                            <h4>Edges</h4>
                 <canvas id="edge-image"></canvas>
             </div>
-            <div class="grid-item">
-                <h4>Identified Points</h4>
+                        <div class="arrow">→</div>
+                        <div class="pattern-step">
+                            <h4>Points</h4>
                 <canvas id="dot-image"></canvas>
             </div>
-            <div class="grid-item">
-                <h4>Sand Garden Image</h4>
+                    </div>
+                </div>
+
+                <!-- Intended Image Panel -->
+                <div class="panel intended-image-panel" style="display: none;">
+                    <h3>Pattern Preview</h3>
+                    <h4><span id="total-points"></span></h4>
                 <canvas id="connect-image"></canvas>
-            </div>
-            <div class="hidden">
-                <h4>contours</h4>
-                <canvas id="plotcontours" width="400" height="400" style="border:1px solid #000000;"></canvas>
-                <button id="plotButton">Plot Next Contour</button>
-            </div>
-            
-            <div class="grid-item span-full-width">
-                <h4>Polar Coordinates to Trace Image <span id="total-points"></span></h4>
-                <textarea readonly id="polar-coordinates-textarea" title="Coordinates of the points that make up the image in (r, theta). r is scaled from 0-1000 and theta is in tengths of a degree (unless you checked single-byte coordinates)"></textarea>
-            </div>
-            <div class="grid-item">
-                <iframe width="100%" height="315" src="https://www.youtube.com/embed/fOfYCiM7BC8" frameborder="0" allowfullscreen></iframe>
-            </div>
-            <div class="grid-item">
-                <iframe width="100%" height="315" src="https://www.youtube.com/embed/AUMiR996WdU" frameborder="0" allowfullscreen></iframe>
-            </div>
-            <div class="grid-item span-full-width">
-                <p><small>Web Page by ORION - Youtube: <a href="https://www.youtube.com/@InspiredByOrion">InspiredByOrion</a></small></p>
+                    <div class="color-legend">
+                        <span>First Point</span>
+                        <div class="color-gradient"></div>
+                        <span>Last Point</span>
+                    </div>
+                </div>
+
+                <!-- Output Coordinates Panel -->
+                <div class="panel output-coordinates-panel" style="display: none;">
+                    <h3>Coordinates</h3>
+                    <textarea readonly id="polar-coordinates-textarea" title="Coordinates of the points that make up the image in (r, theta). r is scaled from 0-1000 and theta is in tenths of a degree (unless you checked single-byte coordinates)"></textarea>
+                    <button id="copy-coordinates-button" class="primary-button" style="width: 100%; margin-top: 1rem;">
+                        Copy to Clipboard
+                    </button>
+                </div>
+
+                <!-- Stream to Arduino Panel (2 columns wide) -->
+                <div class="panel stream-panel span-two-panels" style="display: none;">
+                    <div class="stream-section">
+                        <button class="stream-toggle" onclick="toggleStreamPanel()">
+                            <h3>Stream to Arduino</h3>
+                            <span class="toggle-icon">▼</span>
+                        </button>
+                        <div class="stream-content" id="stream-content" style="display: none;">
+                            <div class="stream-controls">
+                                <button id="connect-serial" class="primary-button">Connect to Serial Port</button>
+                                <button id="disconnect-serial" class="secondary-button" disabled>Disconnect</button>
+                                <button id="start-streaming" class="primary-button" disabled>Start Streaming</button>
+                                <button id="stop-streaming" class="danger-button" disabled>Stop Streaming</button>
+                            </div>
+                            <div class="stream-status">
+                                <div class="status-indicator">
+                                    <span class="status-dot"></span>
+                                    <span id="connection-status">Not Connected</span>
+                                </div>
+                                <div class="progress-info">
+                                    <div class="current-position">
+                                        <span>Current: R=<span id="current-r">0</span>, θ=<span id="current-theta">0</span></span>
+                                    </div>
+                                    <div class="progress-bar">
+                                        <div id="progress-fill" class="progress-fill"></div>
+                                    </div>
+                                    <div class="progress-text">
+                                        <span id="progress-text">0 / 0 points</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="serial-log">
+                                <h4>Serial Communication Log</h4>
+                                <div id="serial-log" class="log-content"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
-    </div>
+
+    <!-- Hidden elements for API mode -->
     <div id="simple-container" style="visibility: hidden;">
         <label id="simple-coords-title">Calculating...</label>
         <label id="simple-coords"></label>
+    </div>
+
+    <!-- Hidden elements for debugging -->
+    <div class="hidden">
+        <h4>contours</h4>
+        <canvas id="plotcontours" width="400" height="400" style="border:1px solid #000000;"></canvas>
+        <button id="plotButton">Plot Next Contour</button>
     </div>
 
 </body>
