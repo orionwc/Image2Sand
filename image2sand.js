@@ -157,7 +157,7 @@ function clearAllImageBoxes() {
 }
 
 function resetMagicMode() {
-    console.log('=== RESET MAGIC MODE CALLED ===');
+    console.log('Resetting Magic Mode');
     
     // Always clear error display and indicators (if they exist)
     const errorDisplay = document.getElementById('magic-error-display');
@@ -175,32 +175,22 @@ function resetMagicMode() {
     });
     
     // Fade out the rightmost (last) image box
-    console.log('=== FADING OUT CONVERSION BOXES ===');
-    console.log('This should ONLY happen on successful draw completion, not on errors');
     const lastBox = document.querySelector('.conversion-box:last-child');
     if (lastBox) {
-        console.log('Fading out last conversion box:', lastBox);
         lastBox.classList.remove('fade-in');
         lastBox.style.opacity = ELEMENT_HIDDEN_OPACITY.toString();
-    } else {
-        console.log('No last conversion box found to fade out');
     }
     
     // Wait for fade out, then reset everything
     setTimeout(() => {
-        console.log('=== CLEARING ALL IMAGE BOXES ===');
-        console.log('This happens 1 second after fade out starts');
         // Clear all image boxes
         clearAllImageBoxes();
         
         // Reset all box opacities to hidden
-        console.log('=== RESETTING ALL BOX OPACITIES ===');
         const allBoxes = document.querySelectorAll('.conversion-box');
-        console.log('Found', allBoxes.length, 'conversion boxes to reset');
-        allBoxes.forEach((box, index) => {
+        allBoxes.forEach((box) => {
             box.classList.remove('fade-in');
             box.style.opacity = ELEMENT_HIDDEN_OPACITY.toString();
-            console.log(`Reset box ${index + 1}:`, box);
         });
         
         // Reset container to initial state
@@ -220,41 +210,26 @@ function resetMagicMode() {
         if (progressText) progressText.textContent = '0%';
         
         // Clear the prompt input field (object name)
-        console.log('=== CLEARING PROMPT INPUT FIELD ===');
         const promptInput = document.getElementById('prompt');
         if (promptInput) {
-            console.log('Prompt input found, current value:', promptInput.value);
-            console.log('Prompt input classes before:', promptInput.classList.toString());
             promptInput.value = '';
             promptInput.classList.remove('voice-prompt-input', 'auto-populated');
-            console.log('Prompt input value after clearing:', promptInput.value);
-            console.log('Prompt input classes after:', promptInput.classList.toString());
-            console.log('Prompt input field cleared successfully');
-        } else {
-            console.log('ERROR: Prompt input field not found!');
         }
         
         // Clear the Magic Mode object highlight as well
-        console.log('=== CLEARING MAGIC MODE OBJECT HIGHLIGHT ===');
         const objectHighlight = document.getElementById('magic-object-highlight');
         if (objectHighlight) {
-            console.log('Magic object highlight found, current text:', objectHighlight.textContent);
             objectHighlight.textContent = '';
             objectHighlight.style.display = 'none';
-            console.log('Magic object highlight cleared successfully');
-        } else {
-            console.log('ERROR: Magic object highlight not found!');
         }
         
         // Always start voice listening after reset (this will call launchMagicMode if needed)
         setTimeout(() => {
-            console.log('=== STARTING VOICE LISTENING AFTER RESET ===');
-            console.log('This happens 2 seconds after fade out starts');
             startVoiceListening();
         }, 1000);
         
     }, 1000); // Wait 1 second for fade out
-    console.log('=== RESET MAGIC MODE SETUP COMPLETE ===');
+    console.log('Magic Mode reset initiated');
 }
 
 
@@ -316,15 +291,39 @@ function setVoiceButtonState(newState) {
             voiceButton.disabled = false;
             // Stop health check when idle
             stopVoiceRecognitionHealthCheck();
+            // Reset transcript text to waiting state (only in normal mode)
+            if (!isMagicMode) {
+                const liveTranscript = document.getElementById('manual-live-transcript');
+                const confidenceFill = document.getElementById('manual-confidence-fill');
+                const confidenceText = document.getElementById('manual-confidence-text');
+                if (liveTranscript) {
+                    liveTranscript.textContent = 'Waiting for microphone...';
+                }
+                // Clear confidence bar
+                if (confidenceFill) confidenceFill.style.width = '0%';
+                if (confidenceText) confidenceText.textContent = '';
+            }
             break;
         case 'listening':
-            buttonText.textContent = 'Listening...';
+            buttonText.textContent = 'Listening';
             voiceButton.disabled = false;
             // Start health check when actively listening
             startVoiceRecognitionHealthCheck();
+            // Update transcript text when listening starts (only in normal mode)
+            if (!isMagicMode) {
+                const liveTranscript = document.getElementById('manual-live-transcript');
+                const confidenceFill = document.getElementById('manual-confidence-fill');
+                const confidenceText = document.getElementById('manual-confidence-text');
+                if (liveTranscript) {
+                    liveTranscript.textContent = 'Say "Draw [what you want it to draw]"';
+                }
+                // Clear confidence bar
+                if (confidenceFill) confidenceFill.style.width = '0%';
+                if (confidenceText) confidenceText.textContent = '';
+            }
             break;
         case 'paused':
-            buttonText.textContent = 'Listening paused';
+            buttonText.textContent = 'Paused';
             voiceButton.disabled = false;
             // Keep health check running when paused (in case of timeout)
             startVoiceRecognitionHealthCheck();
@@ -384,8 +383,6 @@ function switchToTab(tabName) {
 
 // Guided Mode Initialization
 function initializeGuidedMode() {
-    console.log('=== INITIALIZING GUIDED MODE ===');
-    
     // Set up guided mode UI
     updateVoiceStatusIndicators('voice');
     
@@ -393,9 +390,7 @@ function initializeGuidedMode() {
     switchToNormalMode();
     
     // Use smart panel visibility management instead of hiding all panels
-    console.log('About to call updateGuidedModePanelVisibility()');
     updateGuidedModePanelVisibility();
-    console.log('Finished calling updateGuidedModePanelVisibility()');
     
     // Set default input mode to text in guided mode
     const textModeRadio = document.getElementById('text-prompt-mode');
@@ -407,9 +402,6 @@ function initializeGuidedMode() {
     // Show text input and hide voice input
     document.getElementById('text-prompt-input').style.display = 'block';
     document.getElementById('voice-prompt-input').style.display = 'none';
-    
-    console.log('Text mode checked:', textModeRadio ? textModeRadio.checked : 'NOT FOUND');
-    console.log('Voice mode checked:', voiceModeRadio ? voiceModeRadio.checked : 'NOT FOUND');
     
     // Force a visual update by triggering a change event
     if (textModeRadio) {
@@ -428,13 +420,10 @@ function initializeGuidedMode() {
     if (streamToggle) {
         streamToggle.classList.remove('active');
     }
-    
-    console.log('Guided mode initialized - Text mode set as default');
 }
 
 // Mode switching within Guided Mode
 function switchToNormalMode() {
-    console.log('=== SWITCHING TO NORMAL MODE ===');
     // Set Magic Mode flag
     isMagicMode = false;
     window.isMagicMode = false;
@@ -482,17 +471,13 @@ function switchToNormalMode() {
     
     // Update visual state to match the selected input mode
     const selectedInputMode = document.querySelector('input[name="input-mode"]:checked');
-    console.log('Selected input mode:', selectedInputMode ? selectedInputMode.value : 'none');
     if (selectedInputMode) {
-        console.log('Calling switchInputMode with:', selectedInputMode.value);
         switchInputMode(selectedInputMode.value);
     }
     
     // Update prompt mode display to match the selected prompt mode
     const selectedPromptMode = document.querySelector('input[name="prompt-input-mode"]:checked');
-    console.log('Selected prompt mode:', selectedPromptMode ? selectedPromptMode.value : 'none');
     if (selectedPromptMode) {
-        console.log('Calling switchPromptMode with:', selectedPromptMode.value);
         switchPromptMode(selectedPromptMode.value);
     }
     
@@ -501,23 +486,6 @@ function switchToNormalMode() {
     if (promptInput) {
         promptInput.readOnly = false;
     }
-    
-    
-    // Debug: Check final panel states
-    console.log('=== FINAL PANEL STATES ===');
-    const panels = ['patternification-panel', 'intended-image-panel', 'output-coordinates-panel', 'stream-panel'];
-    panels.forEach(panelId => {
-        const panel = document.querySelector(`.${panelId}`);
-        if (panel) {
-            console.log(`${panelId}:`, {
-                styleDisplay: panel.style.display,
-                computedDisplay: getComputedStyle(panel).display,
-                visible: getComputedStyle(panel).display !== 'none'
-            });
-        } else {
-            console.log(`${panelId}: element not found`);
-        }
-    });
 }
 
 // Toggle Magic Mode function for the new toggle switch
@@ -1034,8 +1002,6 @@ function handleVoiceResult(result, isMagicMode = false) {
                 promptInput.classList.remove('auto-populated');
             }, 500);
             
-            // Focus the input to show it's been populated
-            promptInput.focus();
             
             // Manually mirror to Magic Panel since input event won't fire for programmatic changes
             if (isMagicMode) {
@@ -1314,22 +1280,38 @@ function mirrorVoiceRecoToMagic(transcript, result) {
     
     console.log('Mirroring voice to Magic Panel:', transcript);
     
-    // Update Magic Panel transcription
+    // Update Magic Panel transcription (but only if not paused)
+    // (when paused, updateVoiceState handles the text with delay)
     const magicTranscript = document.getElementById('magic-transcription');
     if (magicTranscript) {
-        magicTranscript.textContent = transcript;
-        console.log('Updated Magic Panel transcription');
+        // Only update transcription if currently listening (not paused)
+        const voiceButton = document.getElementById('manual-voice-button');
+        const isPaused = voiceButton && voiceButton.classList.contains('paused');
+        
+        if (!isPaused) {
+            magicTranscript.textContent = transcript;
+            console.log('Updated Magic Panel transcription');
+        } else {
+            console.log('Skipping transcription update - listening is paused');
+        }
     } else {
         console.log('Magic Panel transcription element not found');
     }
     
-    // Check for "draw" command and highlight object
-    const drawMatch = transcript.toLowerCase().match(/draw\s+(.+)/);
-    if (drawMatch) {
+    // ONLY trigger fades when we have a final object name detection (not interim)
+    // This ensures the fade effects only happen when the phrase is complete
+    if (result.objectName) {
         const objectHighlight = document.getElementById('magic-object-highlight');
         const mainObjectDisplay = document.getElementById('manual-detected-object');
         
         if (objectHighlight && mainObjectDisplay) {
+            // Cancel any pending "Listening paused" message since we're showing the object
+            if (window.magicPanel && window.magicPanel.pauseTimeoutId) {
+                clearTimeout(window.magicPanel.pauseTimeoutId);
+                window.magicPanel.pauseTimeoutId = null;
+                console.log('Cancelled pending "Listening paused" message - showing object instead');
+            }
+            
             // Use the new mirroring function to keep everything in sync
             mirrorPromptToMagic(mainObjectDisplay.textContent);
             
@@ -1349,26 +1331,15 @@ function mirrorVoiceRecoToMagic(transcript, result) {
 
 // Fade in voice elements when mic is enabled
 function fadeOutGoButton() {
-    console.log('=== FADE OUT GO BUTTON CALLED ===');
-    
     const goButton = document.getElementById('magic-go-button');
     if (goButton) {
-        console.log('GO Button before:', goButton.style.opacity, 'classList:', goButton.classList.toString());
         goButton.classList.remove('fade-in');
         goButton.style.opacity = ELEMENT_HIDDEN_OPACITY.toString();
         goButton.disabled = true; // Disable the button when faded out
-        console.log('GO Button after:', goButton.style.opacity, 'classList:', goButton.classList.toString(), 'disabled:', goButton.disabled);
-        console.log('GO Button faded out and disabled');
-    } else {
-        console.log('GO Button not found!');
     }
-    
-    console.log('=== GO BUTTON FADE OUT COMPLETE ===');
 }
 
 function fadeInVoiceElements() {
-    console.log('=== FADE IN VOICE ELEMENTS CALLED ===');
-    
     // Fade out the GO button when voice elements fade in
     fadeOutGoButton();
     
@@ -1377,15 +1348,8 @@ function fadeInVoiceElements() {
     const fftCanvas = document.getElementById('magic-fft-canvas');
     const transcription = document.getElementById('magic-transcription');
     
-    console.log('Voice input container found:', !!voiceInputContainer);
-    
     if (voiceInputContainer) {
-        console.log('Voice input container before:', voiceInputContainer.style.opacity, 'classList:', voiceInputContainer.classList.toString());
         voiceInputContainer.classList.add('fade-in');
-        console.log('Voice input container after:', voiceInputContainer.style.opacity, 'classList:', voiceInputContainer.classList.toString());
-        console.log('Voice input container faded in');
-    } else {
-        console.log('Voice input container not found!');
     }
     
     // Update titles for debugging
@@ -1396,24 +1360,17 @@ function fadeInVoiceElements() {
     if (transcription) {
         transcription.title = `Transcription - Opacity: ${ELEMENT_SHOWN_OPACITY}`;
     }
-    
-    console.log('=== VOICE ELEMENTS FADE IN COMPLETE ===');
 }
 
 // Fade out voice elements (except object highlight)
 function fadeOutVoiceElements() {
-    console.log('=== FADE OUT VOICE ELEMENTS CALLED ===');
-    
     // Control the parent voice-input-container opacity instead of individual elements
     const voiceInputContainer = document.querySelector('.voice-input-container');
     const fftCanvas = document.getElementById('magic-fft-canvas');
     const transcription = document.getElementById('magic-transcription');
     
     if (voiceInputContainer) {
-        console.log('Voice input container before fade out:', voiceInputContainer.style.opacity, 'classList:', voiceInputContainer.classList.toString());
         voiceInputContainer.classList.remove('fade-in');
-        console.log('Voice input container after fade out:', voiceInputContainer.style.opacity, 'classList:', voiceInputContainer.classList.toString());
-        console.log('Voice input container faded out');
     }
     
     // Update titles for debugging
@@ -1424,8 +1381,6 @@ function fadeOutVoiceElements() {
     if (transcription) {
         transcription.title = `Transcription - Opacity: ${ELEMENT_HIDDEN_OPACITY}`;
     }
-    
-    console.log('=== VOICE ELEMENTS FADE OUT COMPLETE ===');
 }
 
 // Fade in object highlight only (never fades out)
@@ -1468,12 +1423,9 @@ function updateStreamingProgress(current, total) {
 
 // Unified function to launch Magic Mode (microphone + FFT + fade-in + positioning)
 function launchMagicMode() {
-    console.log('=== LAUNCHING MAGIC MODE ===');
-    
     // Move image locations to their start positions
     try {
         updateFirstBoxWidth();
-        console.log('Image positions reset to start positions');
     } catch (error) {
         console.warn('Failed to reset image positions:', error);
     }
@@ -1631,9 +1583,14 @@ function mirrorImageToMagic(imageElement) {
         ctx.drawImage(imageElement, 0, 0, 200, 200);
         console.log('Source image mirrored to Magic Panel first conversion box');
         
-        // Stop the shimmer effect on the first conversion box
+        // Stop the shimmer effect on the first conversion box and set background to white
         if (firstConversionBox) {
             firstConversionBox.style.animation = 'none';
+            firstConversionBox.classList.add('shimmer-stopped');
+            // Fade from black to white after a brief delay
+            setTimeout(() => {
+                firstConversionBox.classList.add('ready');
+            }, 50);
             console.log('Stopped shimmer effect on first conversion box');
         }
         
@@ -1972,29 +1929,107 @@ function mirrorStreamingProgressToMagic(progress) {
             }
         }
         
-        // Draw white overlay showing current progress
+        // Draw white overlay showing current progress with silver current segment
         if (currentStreamingPattern) {
             try {
-                // Create a separate iterator for white overlay
+                const tolerance = 0.1;
+                
+                // Collect all points up to current
                 const overlayIterator = new PatternIterator(currentStreamingPattern);
                 const totalPoints = overlayIterator.getTotalPoints();
+                const points = [];
+                let previousPoint = null;
                 
-                // Draw white overlay showing progress up to current point
-                drawPatternSegments(ctx, overlayIterator, totalPoints, patternScale, {
-                    maxPoints: progress.current,
-                    strokeStyle: 'rgba(255, 255, 255, 0.9)', // Semi-transparent white for black background
-                    lineWidth: 4, // Thicker than the original lines
-                    lineCap: 'round',
-                    lineJoin: 'round',
-                    tolerance: 0.1,
-                    useSinglePath: true // Use single path for better performance
-                });
+                for (let i = 0; i < Math.min(progress.current, totalPoints); i++) {
+                    const point = overlayIterator.getNext();
+                    if (!point) break;
+                    
+                    const { r, theta } = point;
+                    const thetaRad = theta * Math.PI / 1800;
+                    const x = r * Math.cos(thetaRad) * patternScale;
+                    const y = -r * Math.sin(thetaRad) * patternScale;
+                    
+                    // Check if this is a pen-lift point
+                    const isPenLift = previousPoint && 
+                        Math.abs(r - previousPoint.r) < tolerance && 
+                        Math.abs(theta - previousPoint.theta) < tolerance;
+                    
+                    points.push({ x, y, r, theta, isPenLift });
+                    previousPoint = { r, theta };
+                }
+                
+                if (points.length === 0) return;
+                
+                ctx.lineWidth = 4;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+                
+                const silverColor = 'rgba(192, 192, 192, 0.9)'; // Silver for current segment
+                const fadeSegments = 10;
+                
+                // Determine which points are in which group
+                const currentIndex = points.length - 1;
+                const fadeStartIndex = Math.max(0, currentIndex - fadeSegments);
+                
+                // Draw segments before the fade zone in muted white
+                if (fadeStartIndex > 0) {
+                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+                    ctx.beginPath();
+                    let pathStarted = false;
+                    
+                    for (let i = 0; i < fadeStartIndex; i++) {
+                        const pt = points[i];
+                        if (!pt.isPenLift) {
+                            if (!pathStarted) {
+                                ctx.moveTo(pt.x, pt.y);
+                                pathStarted = true;
+                            } else {
+                                ctx.lineTo(pt.x, pt.y);
+                            }
+                        }
+                    }
+                    if (pathStarted) ctx.stroke();
+                }
+                
+                // Draw the fade zone (previous 10 segments) with gradient from silver to white
+                for (let i = fadeStartIndex; i < currentIndex; i++) {
+                    const pt = points[i];
+                    if (pt.isPenLift) continue;
+                    
+                    const nextPt = points[i + 1];
+                    if (!nextPt) continue;
+                    
+                    // Calculate fade position (0 = silver, 1 = white)
+                    // Use actual number of segments in fade zone, not fixed fadeSegments
+                    const segmentsInFadeZone = Math.max(1, currentIndex - fadeStartIndex);
+                    const fadePos = (i - fadeStartIndex) / segmentsInFadeZone;
+                    
+                    // Interpolate opacity from silver to white
+                    ctx.strokeStyle = `rgba(255, 255, 255, ${0.3 + fadePos * 0.6})`;
+                    
+                    ctx.beginPath();
+                    ctx.moveTo(pt.x, pt.y);
+                    ctx.lineTo(nextPt.x, nextPt.y);
+                    ctx.stroke();
+                }
+                
+                // Draw current segment in SILVER
+                if (currentIndex >= 0 && points[currentIndex] && !points[currentIndex].isPenLift) {
+                    ctx.strokeStyle = silverColor;
+                    ctx.beginPath();
+                    if (currentIndex > 0 && !points[currentIndex - 1].isPenLift) {
+                        ctx.moveTo(points[currentIndex - 1].x, points[currentIndex - 1].y);
+                        ctx.lineTo(points[currentIndex].x, points[currentIndex].y);
+                    }
+                    ctx.stroke();
+                }
+                
             } catch (error) {
                 console.error('Error drawing streaming progress on Magic Panel:', error);
             }
         }
         
-        console.log(`Streaming progress: ${progress.current}/${progress.total} - thick black line drawn`);
+        console.log(`Streaming progress: ${progress.current}/${progress.total} - current segment SILVER, previous 10 fade from silver to white`);
     }
     }, () => {
         console.warn('Failed to mirror streaming progress to Magic Panel');
@@ -2361,19 +2396,13 @@ function updateStreamingProgressOnCanvas(current, total) {
     if (!currentStreamingPattern) return;
     
     try {
+        const tolerance = 0.1; // Tolerance for detecting pen-lift (repeated coordinates)
+        
+        // Collect all points up to current
         const patternIterator = new PatternIterator(currentStreamingPattern);
         const totalPoints = patternIterator.getTotalPoints();
-        
-        // Draw progress up to current point, skipping pen-lift areas
-        ctx.strokeStyle = 'rgba(0, 0, 0, 0.8)'; // Semi-transparent black
-        ctx.lineWidth = 4; // Thicker than the original lines
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-        
-        ctx.beginPath();
-        let firstPoint = true;
+        const points = [];
         let previousPoint = null;
-        const tolerance = 0.1; // Tolerance for detecting pen-lift (repeated coordinates)
         
         for (let i = 0; i < Math.min(current, totalPoints); i++) {
             const point = patternIterator.getNext();
@@ -2384,29 +2413,84 @@ function updateStreamingProgressOnCanvas(current, total) {
             const x = r * Math.cos(thetaRad) * scale;
             const y = -r * Math.sin(thetaRad) * scale;
             
-            // Check if this is a pen-lift point (same as previous point)
+            // Check if this is a pen-lift point
             const isPenLift = previousPoint && 
                 Math.abs(r - previousPoint.r) < tolerance && 
                 Math.abs(theta - previousPoint.theta) < tolerance;
             
-            if (isPenLift) {
-                // Skip drawing over pen-lift areas - leave them transparent
-                // Just move to the point without drawing
-                ctx.moveTo(x, y);
-            } else {
-                // Normal drawing
-                if (firstPoint) {
-                    ctx.moveTo(x, y);
-                    firstPoint = false;
-                } else {
-                    ctx.lineTo(x, y);
-                }
-            }
-            
+            points.push({ x, y, r, theta, isPenLift });
             previousPoint = { r, theta };
         }
         
-        ctx.stroke();
+        if (points.length === 0) {
+            ctx.restore();
+            return;
+        }
+        
+        ctx.lineWidth = 4;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        
+        const targetColor = 'rgba(0, 0, 0, 0.8)'; // Semi-transparent black
+        const silverColor = 'rgba(192, 192, 192, 0.9)'; // Silver for current segment
+        const fadeSegments = 10;
+        
+        // Determine which points are in which group
+        const currentIndex = points.length - 1;
+        const fadeStartIndex = Math.max(0, currentIndex - fadeSegments);
+        
+        // Draw segments before the fade zone in muted black
+        if (fadeStartIndex > 0) {
+            ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
+            ctx.beginPath();
+            let pathStarted = false;
+            
+            for (let i = 0; i < fadeStartIndex; i++) {
+                const pt = points[i];
+                if (!pt.isPenLift) {
+                    if (!pathStarted) {
+                        ctx.moveTo(pt.x, pt.y);
+                        pathStarted = true;
+                    } else {
+                        ctx.lineTo(pt.x, pt.y);
+                    }
+                }
+            }
+            if (pathStarted) ctx.stroke();
+        }
+        
+        // Draw the fade zone (previous 10 segments) with gradient from silver to black
+        for (let i = fadeStartIndex; i < currentIndex; i++) {
+            const pt = points[i];
+            if (pt.isPenLift) continue;
+            
+            const nextPt = points[i + 1];
+            if (!nextPt) continue;
+            
+            // Calculate fade position (0 = silver, 1 = target color)
+            // Use actual number of segments in fade zone, not fixed fadeSegments
+            const segmentsInFadeZone = Math.max(1, currentIndex - fadeStartIndex);
+            const fadePos = (i - fadeStartIndex) / segmentsInFadeZone;
+            
+            // Interpolate color from silver to target
+            ctx.strokeStyle = `rgba(0, 0, 0, ${0.3 + fadePos * 0.5})`;
+            
+            ctx.beginPath();
+            ctx.moveTo(pt.x, pt.y);
+            ctx.lineTo(nextPt.x, nextPt.y);
+            ctx.stroke();
+        }
+        
+        // Draw current segment in SILVER
+        if (currentIndex >= 0 && points[currentIndex] && !points[currentIndex].isPenLift) {
+            ctx.strokeStyle = silverColor;
+            ctx.beginPath();
+            if (currentIndex > 0 && !points[currentIndex - 1].isPenLift) {
+                ctx.moveTo(points[currentIndex - 1].x, points[currentIndex - 1].y);
+                ctx.lineTo(points[currentIndex].x, points[currentIndex].y);
+            }
+            ctx.stroke();
+        }
         
     } catch (error) {
         console.error('Error drawing streaming progress:', error);
@@ -2705,6 +2789,16 @@ async function generateImage(apiKey, prompt, autoprocess) {
         isGeneratingImage = true;
         const genButton = document.getElementById('gen-image-button');
         const status = document.getElementById('generation-status');
+        
+        // Clear image placeholder and canvas
+        const placeholder = document.getElementById('image-placeholder');
+        const originalImage = document.getElementById('original-image');
+        const originalCanvas = originalImage?.getContext('2d');
+        
+        if (placeholder) placeholder.style.display = 'none';
+        if (originalCanvas && originalImage) {
+            originalCanvas.clearRect(0, 0, originalImage.width, originalImage.height);
+        }
         
         if (genButton) genButton.disabled = true;
         if (status) status.style.display = 'block';
@@ -3068,31 +3162,30 @@ function toggleStreamPanel() {
 // Input Mode Switching
 function switchInputMode(mode) {
     console.log('switchInputMode called with mode:', mode);
-    
     // Hide all input contents
-    console.log('Hiding all input-content elements:');
-    document.querySelectorAll('.input-content').forEach(content => {
-        console.log('Hiding:', content.id, 'current display:', content.style.display);
+    const allInputContents = document.querySelectorAll('.input-content');
+    console.log('Found', allInputContents.length, 'input-content elements');
+    allInputContents.forEach(content => {
         content.style.display = 'none';
     });
     
     // Show selected input content
     const selectedContent = document.getElementById(`${mode}-input`);
-    console.log('Selected content element:', selectedContent);
+    console.log(`Looking for ${mode}-input element:`, selectedContent);
     if (selectedContent) {
         selectedContent.style.display = 'block';
         console.log('Set display to block for:', selectedContent.id);
+        console.log('Computed display after setting:', getComputedStyle(selectedContent).display);
+        console.log('Element dimensions:', selectedContent.offsetWidth, 'x', selectedContent.offsetHeight);
+        console.log('Parent element:', selectedContent.parentElement);
+    } else {
+        console.error(`Input content not found for mode: ${mode}`);
     }
-    
-    // Debug: Check final state of all input-content elements
-    console.log('Final state of all input-content elements:');
-    document.querySelectorAll('.input-content').forEach(content => {
-        console.log(content.id, 'display:', content.style.display, 'computed display:', getComputedStyle(content).display);
-    });
     
     // Update prompt mode display to match the selected prompt mode
     const selectedPromptMode = document.querySelector('input[name="prompt-input-mode"]:checked');
-    if (selectedPromptMode) {
+    if (selectedPromptMode && mode === 'generate') {
+        // Only call switchPromptMode for generate mode, not for coordinates
         switchPromptMode(selectedPromptMode.value);
     }
     
@@ -3103,10 +3196,7 @@ function switchInputMode(mode) {
         const hasText = coordinatesTextarea.value.trim().length > 0;
         const shouldShow = mode === 'coordinates' && hasText;
         continueButton.style.display = shouldShow ? 'block' : 'none';
-        console.log('Continue button visibility:', { mode, hasText, shouldShow });
     }
-    
-    
 }
 
 // Prompt Input Mode Switching
@@ -3142,8 +3232,6 @@ function hidePanel(panelClass) {
 
 // Smart panel visibility management for Guided Mode
 function updateGuidedModePanelVisibility() {
-    console.log('=== UPDATING GUIDED MODE PANEL VISIBILITY ===');
-    
     // Always show input panel
     showPanel('input-panel');
     
@@ -3155,49 +3243,40 @@ function updateGuidedModePanelVisibility() {
                          !originalImageElement.src.includes('data:image/svg+xml');
     
     if (hasValidImage) {
-        console.log('Showing image panel - valid image exists');
         showPanel('image-panel');
     } else {
-        console.log('Hiding image panel - no valid image');
         hidePanel('image-panel');
     }
     
     // Patternification panel - show only if there are coordinates AND a source image exists
     const coordinatesText = document.getElementById('polar-coordinates-textarea');
-    const hasCoordinates = coordinatesText && coordinatesText.value.trim().length > 0;
+    // Check if textarea has any content - don't use trim() as whitespace format uses spaces/tabs for encoding
+    const hasCoordinates = coordinatesText && coordinatesText.value.length > 0;
     
     if (hasCoordinates && hasValidImage) {
-        console.log('Showing patternification panel - coordinates exist and source image exists');
         showPanel('patternification-panel');
     } else {
-        console.log('Hiding patternification panel - no coordinates or no source image');
         hidePanel('patternification-panel');
     }
     
     // Intended image panel - show only if there are coordinates
     if (hasCoordinates) {
-        console.log('Showing intended image panel - coordinates exist');
         showPanel('intended-image-panel');
     } else {
-        console.log('Hiding intended image panel - no coordinates');
         hidePanel('intended-image-panel');
     }
     
     // Output coordinates panel - show only if there are coordinates
     if (hasCoordinates) {
-        console.log('Showing output coordinates panel - coordinates exist');
         showPanel('output-coordinates-panel');
     } else {
-        console.log('Hiding output coordinates panel - no coordinates');
         hidePanel('output-coordinates-panel');
     }
     
     // Stream panel - show only if there are coordinates (streaming logic is separate)
     if (hasCoordinates) {
-        console.log('Showing stream panel - coordinates exist');
         showPanel('stream-panel');
     } else {
-        console.log('Hiding stream panel - no coordinates');
         hidePanel('stream-panel');
     }
 }
@@ -3226,13 +3305,11 @@ function hideVoicePanel(panelClass) {
 // Voice Mode Switching
 
 function switchToGuidedMode() {
-    console.log('=== SWITCHING TO GUIDED MODE ===');
     isAutoMode = false;
     document.getElementById('guided-mode').classList.add('active');
     document.getElementById('magic-mode').classList.remove('active');
     
     // First, hide ALL panels to reset from magic mode state
-    console.log('Resetting all panels from magic mode state');
     hidePanel('image-panel');
     hidePanel('patternification-panel');
     hidePanel('intended-image-panel');
@@ -3764,19 +3841,19 @@ document.addEventListener('DOMContentLoaded', function() {
     // Initialize tab system
     switchToTab('guided');
     
-    // Debug helper: Press 'm' key to set transcription to 'draw a monkey'
+    // Debug helper: Press '=' key to set transcription to 'draw a squirrel'
     document.addEventListener('keydown', function(event) {
-        if (event.key.toLowerCase() === 'm') {
-            console.log('Debug: M key pressed - triggering voice result handler with "draw a monkey"');
+        if (event.key && event.key === '=') {
+            console.log('Debug: = key pressed - triggering voice result handler with "draw a squirrel"');
             
-            // Trigger the voice result handler as if "draw a monkey" was detected
+            // Trigger the voice result handler as if "draw a squirrel" was detected
             if (window.voiceRecognition && window.voiceRecognition.onResultCallback) {
                 window.voiceRecognition.onResultCallback({
-                    interim: 'draw a monkey',
-                    final: 'draw a monkey',
+                    interim: 'draw a squirrel',
+                    final: 'draw a squirrel',
                     confidence: 1.0,
                     drawDetected: true,
-                    objectName: 'Monkey'
+                    objectName: 'Squirrel'
                 });
             }
         }
@@ -3843,7 +3920,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     startVoiceListening();
                     break;
                 case 'listening':
-                    stopVoiceListening();
+                    // User clicked to stop - fully stop instead of just pausing
+                    resetVoiceRecognitionState();
                     break;
                 case 'paused':
                     resumeVoiceProcessing();
@@ -3856,20 +3934,14 @@ document.addEventListener('DOMContentLoaded', function() {
     const magicGoButton = document.getElementById('magic-go-button');
     if (magicGoButton) {
         magicGoButton.addEventListener('click', () => {
-            // GO button now works exactly like the microphone button
-            // It uses the same voice recognition system regardless of mode
+            // GO button should only start listening (button disabled when active)
             console.log('GO button clicked, current voice button state:', voiceButtonState);
             
-            switch (voiceButtonState) {
-                case 'idle':
-                    startVoiceListening();
-                    break;
-                case 'listening':
-                    stopVoiceListening();
-                    break;
-                case 'paused':
-                    resumeVoiceProcessing();
-                    break;
+            // GO button is only visible/clickable when idle - it disappears when listening starts
+            if (voiceButtonState === 'idle') {
+                startVoiceListening();
+            } else {
+                console.log('GO button clicked but voice already active - button should be hidden');
             }
         });
     }
@@ -3952,10 +4024,6 @@ document.addEventListener('DOMContentLoaded', function() {
     if (generateButton) generateButton.addEventListener('click', convertImage);
     if (genImageButton) {
         genImageButton.addEventListener('click', () => {
-            console.log('=== GENERATE BUTTON CLICKED ===');
-            console.log('Text mode checked:', document.getElementById('text-prompt-mode').checked);
-            console.log('Voice mode checked:', document.getElementById('voice-prompt-mode').checked);
-            
             const apiKey = document.getElementById('api-key').value;
             const prompt = document.getElementById('prompt').value + (document.getElementById('googly-eyes').checked ? ' with disproportionately large googly eyes' : '');
             
@@ -4094,7 +4162,7 @@ function updateMagicVoiceButton(listening) {
     
     if (listening) {
         voiceButton.classList.add('listening');
-        buttonText.textContent = 'Listening...';
+        buttonText.textContent = 'Listening';
         buttonSubtext.style.display = 'block';
         voiceButton.disabled = false; // Keep enabled so it can be clicked to cancel
     } else {
@@ -4109,5 +4177,4 @@ function updateMagicVoiceButton(listening) {
 window.switchToTab = switchToTab;
 window.toggleSettings = toggleSettings;
 window.toggleVoiceSettings = toggleVoiceSettings;
-window.toggleStreamPanel = toggleStreamPanel;
 window.toggleStreamPanel = toggleStreamPanel;

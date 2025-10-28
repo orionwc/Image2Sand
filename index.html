@@ -94,7 +94,7 @@ SOFTWARE.
                 <div class="video-section">
                     <h3>Draw any Image</h3>
                     <iframe width="100%" height="315" src="https://www.youtube.com/embed/fOfYCiM7BC8?rel=0" frameborder="0" allowfullscreen></iframe>
-                    <button class="mode-button" onclick="switchToTab('guided'); document.getElementById('pen-up-toggle').checked = false;">
+                    <button class="mode-button" onclick="switchToTab('guided'); document.getElementById('upload-mode').checked = true; switchInputMode('upload'); document.getElementById('pen-up-toggle').checked = false;">
                         Upload an Image
                     </button>
                 </div>
@@ -286,32 +286,23 @@ SOFTWARE.
                                 
                                 <!-- Voice Prompt Mode -->
                                 <div id="voice-prompt-input" class="prompt-input-content" style="display: none;">
-                                    <div class="voice-prompt-controls">
+                                        <div class="voice-prompt-layout">
                                         <button id="manual-voice-button" class="voice-button">
                                             <span class="button-icon">🎤</span>
                                             <span class="button-text">Ask by Voice</span>
                                             <span class="button-subtext" style="display: none;">Click to cancel</span>
                                         </button>
-                                        <div class="speech-indicator">
-                                            <div id="manual-speech-dot" class="status-dot"></div>
-                                            <span id="manual-speech-status">Not listening</span>
-                                        </div>
-                                    </div>
-                                    <div class="voice-prompt-status">
-                                        <div class="voice-status-labels">
-                                            <h4>Live Transcript:</h4>
-                                            <h4>Confidence:</h4>
-                                        </div>
-                                        <div class="voice-status-content">
-                                            <div class="transcript-display">
-                                                <div id="manual-live-transcript" class="transcript-text">Waiting for speech...</div>
-                                            </div>
-                                            <div class="confidence-display">
-                                                <div class="confidence-bar">
-                                                    <div id="manual-confidence-fill" class="confidence-fill"></div>
+                                        
+                                        <div class="transcript-section">
+                                            <div class="transcript-header">
+                                                <div class="confidence-bar-container" title="Confidence">
+                                                    <div class="confidence-bar">
+                                                        <div id="manual-confidence-fill" class="confidence-fill"></div>
+                                                        <span id="manual-confidence-text" class="confidence-text">0%</span>
+                                                    </div>
                                                 </div>
-                                                <span id="manual-confidence-text">0%</span>
                                             </div>
+                                            <div id="manual-live-transcript" class="transcript-text">Waiting for microphone...</div>
                                         </div>
                                     </div>
                                     <div class="detected-object" style="display: none;">
@@ -322,29 +313,31 @@ SOFTWARE.
                                 
                                 <!-- Single Prompt Input (always visible) -->
                         <div class="input-group">
-                            <label for="prompt">Image Prompt:</label>
-                                    <input type="text" id="prompt" placeholder="What do you want to draw?" maxlength="500" class="voice-prompt-input">
-                            <div class="checkbox-container">
-                                <input type="checkbox" id="googly-eyes" name="googly-eyes">
-                                <label for="googly-eyes">Add googly eyes</label>
-                            </div>
-                                    <button id="gen-image-button" class="primary-button">Create</button>
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                                <label for="prompt">Image Prompt:</label>
+                                <div class="checkbox-container">
+                                    <input type="checkbox" id="googly-eyes" name="googly-eyes">
+                                    <label for="googly-eyes">Add googly eyes</label>
                                 </div>
+                            </div>
+                            <input type="text" id="prompt" placeholder="What do you want to draw?" maxlength="500" class="voice-prompt-input">
+                            <button id="gen-image-button" class="primary-button">Create</button>
                         </div>
                             
                         <label id="generation-status" style="display: none;">Image is generating - please wait...</label>
-                    </div>
-                                      
-                        <!-- Coordinates Mode -->
-                        <div id="coordinates-input" class="input-content" style="display: none;">
-                            <div class="input-group">
-                                <label for="coordinates-text">Paste Coordinates:</label>
-                                <textarea id="coordinates-text" placeholder="Paste coordinates here..."></textarea>
                             </div>
-                            <button id="continue-coordinates-button" class="primary-button" style="display: none;">Continue</button>
                         </div>
+                    
+                    <!-- Coordinates Mode -->
+                    <div id="coordinates-input" class="input-content" style="display: none;">
+                        <div class="input-group">
+                            <label for="coordinates-text">Paste Coordinates:</label>
+                            <textarea id="coordinates-text" placeholder="Paste coordinates here..." rows="5"></textarea>
+                        </div>
+                        <button id="continue-coordinates-button" class="primary-button" style="display: none;">Continue</button>
                     </div>
                 </div>
+            </div>
 
                 <!-- Image Panel -->
                 <div class="panel image-panel">

@@ -18,6 +18,7 @@ class MagicPanel {
         this.waveformAnimation = null;
         this.streamingProgress = 0;
         this.streamingOverlay = null;
+        this.pauseTimeoutId = null; // Track pause timeout for cancellation
         
         try {
             this.initializeElements();
@@ -44,9 +45,6 @@ class MagicPanel {
         this.fftCanvas = document.getElementById(MAGIC_ELEMENT_IDS.FFT_CANVAS);
         this.fftCtx = this.fftCanvas ? this.fftCanvas.getContext('2d') : null;
         
-        // Start button
-        // Start button removed - using GO button instead
-        console.log('Start button removed - using GO button instead');
         
         // Voice elements
         this.waveform = document.getElementById(MAGIC_ELEMENT_IDS.WAVEFORM);
@@ -726,6 +724,13 @@ class MagicPanel {
     updateVoiceState(state) {
         console.log('MagicPanel updating voice state to:', state);
         
+        // Clear any existing pause timeout (e.g. if resuming before 1.5s delay)
+        if (this.pauseTimeoutId) {
+            clearTimeout(this.pauseTimeoutId);
+            this.pauseTimeoutId = null;
+            console.log('Cancelled pending "Listening paused" message');
+        }
+        
         // Update voice state element
         if (this.voiceState) {
             // Remove all state classes
@@ -750,10 +755,23 @@ class MagicPanel {
         if (this.transcription) {
             switch (state) {
                 case 'listening':
+                    // If we're resuming from paused state, update immediately
                     this.transcription.textContent = 'Listening...';
                     break;
                 case 'paused':
-                    this.transcription.textContent = 'Listening paused';
+                    // Freeze current text for 2 seconds, then show "Listening paused"
+                    // Only if still in paused state after the delay
+                    this.pauseTimeoutId = setTimeout(() => {
+                        // Double-check we're still paused before showing the message
+                        // (don't show if resume happened within the delay)
+                        const voiceButton = document.getElementById('manual-voice-button');
+                        if (voiceButton && voiceButton.classList.contains('paused')) {
+                            this.transcription.textContent = 'Listening paused';
+                            console.log('Showing "Listening paused" after 2s delay');
+                        }
+                        this.pauseTimeoutId = null;
+                    }, 2000);
+                    // Keep current text frozen during the delay
                     break;
                 case 'idle':
                 default:

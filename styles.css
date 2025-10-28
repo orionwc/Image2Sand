@@ -432,7 +432,7 @@ input:checked + .toggle-slider .toggle-label {
         rgba(0, 255, 255, 0.3) 100%
     );
     background-size: 200% 200%;
-    animation: energyPulse 4s ease-in-out infinite, materializeGlow 3s ease-in-out infinite;
+    animation: energyPulse 4s ease-in-out infinite;
     z-index: 10;
     pointer-events: none;
     border-radius: 8px;
@@ -449,7 +449,7 @@ input:checked + .toggle-slider .toggle-label {
         radial-gradient(circle at 20% 80%, rgba(255, 255, 255, 0.4) 0%, transparent 50%),
         radial-gradient(circle at 80% 20%, rgba(0, 255, 255, 0.3) 0%, transparent 50%),
         radial-gradient(circle at 40% 40%, rgba(255, 0, 150, 0.2) 0%, transparent 50%);
-    animation: materializeGlow 2.5s ease-in-out infinite reverse;
+    animation: none;
     z-index: 9;
     pointer-events: none;
     border-radius: 8px;
@@ -791,6 +791,12 @@ input[type="radio"]:disabled {
 
 .input-group {
     margin-bottom: 1rem;
+    margin-top: 1rem;
+}
+
+#voice-prompt-input .input-group {
+    margin-top: 0;
+    padding-top: 1rem;
 }
 
 .input-group label {
@@ -1032,11 +1038,19 @@ input[type="radio"]:disabled {
     display: flex;
     align-items: center;
     gap: 0.5rem;
+    justify-content: flex-end;
+    margin-bottom: 0;
 }
 
 .checkbox-container input[type="checkbox"] {
     width: auto;
     margin: 0;
+    vertical-align: middle;
+}
+
+.checkbox-container label {
+    font-size: 0.9rem;
+    font-style: italic;
 }
 
 /* Patternification Panel */
@@ -1408,19 +1422,86 @@ input[type="radio"]:disabled {
 }
 
 /* Voice Prompt Controls */
+.voice-prompt-layout {
+    display: flex;
+    align-items: flex-start;
+    gap: 1.5rem;
+    margin-bottom: 1rem;
+}
+
+.voice-prompt-layout .voice-button {
+    width: auto;
+    min-width: 180px;
+    height: fit-content;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.transcript-section {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.transcript-header {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+}
+
+.transcript-header h4 {
+    margin: 0;
+}
+
+.confidence-bar-container {
+    display: flex;
+    align-items: center;
+}
+
+.confidence-bar {
+    position: relative;
+    width: 150px;
+    height: 20px;
+    background: var(--background-light);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+}
+
+.confidence-fill {
+    height: 100%;
+    background: var(--primary-color);
+    transition: width 0.3s ease;
+}
+
+.confidence-text {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-light);
+    z-index: 1;
+}
+
+.transcript-text {
+    min-height: 40px;
+    padding: 0.75rem;
+    background: var(--background-light);
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-light);
+}
+
 .voice-prompt-controls {
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 1rem;
     margin-bottom: 1rem;
-}
-
-.voice-button {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0.25rem;
 }
 
 .voice-button .button-icon {
@@ -2284,24 +2365,26 @@ input[type="radio"]:disabled {
 }
 
 .conversion-box:first-child {
-    background: linear-gradient(45deg, #111, #fff, #ccc, #fff, #111);
+    background: linear-gradient(135deg, #000, #888, #fff, #aaa, #555, #fff, #ccc, #000);
     background-size: 400% 400%;
-    animation: silverShimmer 1.5s ease-in-out infinite;
+    animation: silverShimmer 4s ease-in-out infinite;
     box-shadow: 0 0 20px rgba(255, 255, 255, 0.5), inset 0 0 20px rgba(255, 255, 255, 0.3);
+}
+
+.conversion-box:first-child.shimmer-stopped {
+    background: #fff;
+    box-shadow: none;
 }
 
 @keyframes silverShimmer {
     0% { 
-        background-position: 0% 50%; 
-        box-shadow: 0 0 20px rgba(255, 255, 255, 0.5), inset 0 0 20px rgba(255, 255, 255, 0.3);
+        background-position: 0% 0%;
     }
     50% { 
-        background-position: 100% 50%; 
-        box-shadow: 0 0 30px rgba(255, 255, 255, 0.8), inset 0 0 30px rgba(255, 255, 255, 0.6);
+        background-position: 100% 100%;
     }
     100% { 
-        background-position: 0% 50%; 
-        box-shadow: 0 0 20px rgba(255, 255, 255, 0.5), inset 0 0 20px rgba(255, 255, 255, 0.3);
+        background-position: 0% 0%;
     }
 }
 
