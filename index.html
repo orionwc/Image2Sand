@@ -477,7 +477,8 @@ SOFTWARE.
                             <div class="stream-controls">
                                 <button id="connect-serial" class="primary-button">Connect to Serial Port</button>
                                 <button id="disconnect-serial" class="secondary-button" disabled>Disconnect</button>
-                                <button id="start-streaming" class="primary-button" disabled>Start Streaming</button>
+                                <!-- UPDATE THIS: Update the tooltip message if the streaming behavior changes -->
+                                <button id="start-streaming" class="primary-button" disabled title="Warning: If you stream 2 sets of coordinates without refreshing this page, you may encounter issues such as it jumping between coordinates">Start Streaming</button>
                                 <button id="stop-streaming" class="danger-button" disabled>Stop Streaming</button>
                             </div>
                             <div class="stream-status">
