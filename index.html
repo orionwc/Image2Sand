@@ -409,6 +409,10 @@ SOFTWARE.
                             <label for="pen-up-toggle" title="Repeats the prior coordinate to indicate the need to lift the pen/marble. This will provide a better representation of the image when lifting the drawing element is possible.">Repeat Coordinate for PenUp</label>
                             <input type="checkbox" id="pen-up-toggle" name="pen-up-toggle">
                         </div>
+                        <div class="checkbox-container">
+                            <label for="add-interpolated-points" title="Adds interpolated points along straight lines to ensure it better follows the intended path">Add interpolated points</label>
+                            <input type="checkbox" id="add-interpolated-points" name="add-interpolated-points">
+                        </div>
                     </div>
                 </div>
             </div>
@@ -445,6 +449,11 @@ SOFTWARE.
                         <span>First Point</span>
                         <div class="color-gradient"></div>
                         <span>Last Point</span>
+                    </div>
+                    <div class="pattern-progress-slider-container">
+                        <span id="pattern-progress-label" class="pattern-progress-label">0 / 0 points</span>
+                        <input type="range" id="pattern-progress-slider" min="0" max="100" value="100" step="1" class="pattern-progress-slider">
+                        <span id="pattern-progress-coord" class="pattern-progress-coord">R=0, θ=0</span>
                     </div>
                 </div>
 

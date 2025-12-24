@@ -140,36 +140,58 @@ async function _processImage(imgElement, config) {
     const result = _processImageCore(imgElement);
     
     // Generate coordinates using the core function
-    const coordsResult = _generateDots(result.edgeImage, config.epsilon, config.contourMode, config.isLoop, config.minimizeJumps, config.outputFormat, config.maxPoints, config.penUpEnabled, imgElement);
+    const coordsResult = _generateDots(result.edgeImage, config.epsilon, config.contourMode, config.isLoop, config.minimizeJumps, config.outputFormat, config.maxPoints, config.penUpEnabled, imgElement, config.addInterpolatedPoints);
+    
+    // Remove unintentional duplicates that would round to the same value, preserving intentional pen-ups
+    console.log('=== BEFORE removeUnintentionalDuplicates ===');
+    console.log(`Input points: ${coordsResult.polarPoints.length}, Intentional pen-ups: ${coordsResult.intentionalPenUpIndices ? coordsResult.intentionalPenUpIndices.size : 0}`);
+    coordsResult.polarPoints.forEach((p, i) => {
+        const isPenUp = coordsResult.intentionalPenUpIndices && coordsResult.intentionalPenUpIndices.has(i);
+        console.log(`  [${i}] r=${p.r.toFixed(2)}, theta=${p.theta.toFixed(2)}${isPenUp ? ' [INTENTIONAL PEN-UP]' : ''}`);
+    });
+    
+    const cleanedResult = removeUnintentionalDuplicates(
+        coordsResult.polarPoints, 
+        config.outputFormat, 
+        coordsResult.intentionalPenUpIndices
+    );
+    
+    console.log('=== AFTER removeUnintentionalDuplicates ===');
+    console.log(`Output points: ${cleanedResult.polarPoints.length}, Intentional pen-ups: ${cleanedResult.intentionalPenUpIndices.size}`);
+    cleanedResult.polarPoints.forEach((p, i) => {
+        const isPenUp = cleanedResult.intentionalPenUpIndices.has(i);
+        console.log(`  [${i}] r=${p.r.toFixed(2)}, theta=${p.theta.toFixed(2)}${isPenUp ? ' [INTENTIONAL PEN-UP]' : ''}`);
+    });
     
     // Format the coordinates
-    const formattedString = _formatCoordinates(coordsResult.polarPoints, config.outputFormat);
+    const formattedString = _formatCoordinates(cleanedResult.polarPoints, config.outputFormat);
     
     // Cleanup src but keep edgeImage for UI use
     result.src.delete(); 
     
     // Return both the formatted string (for backward compatibility) and additional data
+    // Use cleaned polarPoints for consistency with formatted output
     return {
         formattedString: formattedString,
         processedContours: coordsResult.processedContours,
         orderedPoints: coordsResult.orderedPoints,
-        polarPoints: coordsResult.polarPoints,
+        polarPoints: cleanedResult.polarPoints, // Use cleaned points
         edgeImage: result.edgeImage  // Include edgeImage for UI use
     };
 }
 
 // Core dots generation function (renamed from generateDotsCore)
-function _generateDots(edgeImage, epsilon, contourMode, isLoop, minimizeJumps, outputFormat, maxPoints, penUpEnabled = false, originalImageElement) {
+function _generateDots(edgeImage, epsilon, contourMode, isLoop, minimizeJumps, outputFormat, maxPoints, penUpEnabled = false, originalImageElement, shouldAddInterpolatedPoints = false) {
     const retrievalMode = (contourMode == 'External') ?  cv.RETR_EXTERNAL : cv.RETR_TREE;    
     
     const orderedContours = getOrderedContours(edgeImage, epsilon, retrievalMode, maxPoints);
 
     const tracedContours = traceContours(orderedContours, isLoop, minimizeJumps);
 
-    // Only apply additional interpolation if .thr format (format 2) is selected
+    // Apply interpolation if enabled
     let processedContours;
-    if (outputFormat === 2) {
-        // Apply interpolation for .thr format which needs more points for straight lines
+    if (shouldAddInterpolatedPoints) {
+        // Apply interpolation which adds more points for straight lines
         processedContours = tracedContours.map(contour => 
             addInterpolatedPoints(contour, epsilon)
         );
@@ -194,19 +216,108 @@ function _generateDots(edgeImage, epsilon, contourMode, isLoop, minimizeJumps, o
     
     // For pen-up mode, we need to work with contours to identify boundaries
     // For normal mode, we can work with the flattened orderedPoints
-    let polarPoints;
+    let polarPoints, intentionalPenUpIndices;
     if (penUpEnabled) {
         // Use contours to maintain structure for pen-up logic
-        polarPoints = _calculatePolarCoordinatesFromPoints(orderedPoints, true, processedContours, isLoop);
+        const result = _calculatePolarCoordinatesFromPoints(orderedPoints, true, processedContours, isLoop);
+        polarPoints = result.polarPoints;
+        intentionalPenUpIndices = result.intentionalPenUpIndices;
     } else {
         // Use flattened points for normal processing
-        polarPoints = _calculatePolarCoordinatesFromPoints(orderedPoints);
+        const result = _calculatePolarCoordinatesFromPoints(orderedPoints);
+        polarPoints = result.polarPoints;
+        intentionalPenUpIndices = result.intentionalPenUpIndices;
     }
     
     return {
         processedContours,
         orderedPoints,
-        polarPoints
+        polarPoints,
+        intentionalPenUpIndices
+    };
+}
+
+// Round/normalize a coordinate for a given output format
+// Returns the rounded r and theta values that will be used in the formatted output
+function roundCoordinateForFormat(point, outputFormat) {
+    switch (outputFormat) {
+        case 0: // Default
+            const normalizedTheta0 = ((point.theta % 3600) + 3600) % 3600;
+            return {
+                r: Math.round(point.r),
+                theta: Math.round(normalizedTheta0)
+            };
+        case 1: // Single Byte
+            const normalizedTheta1 = ((point.theta % 3600) + 3600) % 3600;
+            return {
+                r: Math.round(255 * point.r / 1000),
+                theta: Math.round(255 * normalizedTheta1 / 3600)
+            };
+        case 2: // .thr
+            const rotatedTheta = point.theta - 900;
+            return {
+                r: parseFloat((point.r / 1000).toFixed(5)),
+                theta: parseFloat((-rotatedTheta * Math.PI / 1800).toFixed(5))
+            };
+        case 3: // Whitespace
+            const normalizedTheta3 = ((point.theta % 3600) + 3600) % 3600;
+            return {
+                r: Math.round(255 * point.r / 1000),
+                theta: Math.round(255 * normalizedTheta3 / 3600)
+            };
+        default:
+            return { r: point.r, theta: point.theta };
+    }
+}
+
+// Remove unintentional duplicates that would round to the same value, preserving intentional pen-ups
+function removeUnintentionalDuplicates(polarPoints, outputFormat, intentionalPenUpIndices) {
+    if (!intentionalPenUpIndices || intentionalPenUpIndices.size === 0) {
+        // No intentional pen-ups, but we should still check for rounding collisions
+        intentionalPenUpIndices = new Set();
+    }
+    
+    const cleanedPoints = [];
+    const cleanedIntentionalIndices = new Set();
+    let removedCount = 0;
+    
+    for (let i = 0; i < polarPoints.length; i++) {
+        const currentPoint = polarPoints[i];
+        const isIntentionalPenUp = intentionalPenUpIndices.has(i);
+        
+        // Check if this point would round to the same value as the previous point
+        if (cleanedPoints.length > 0) {
+            const prevPoint = cleanedPoints[cleanedPoints.length - 1];
+            const roundedPrev = roundCoordinateForFormat(prevPoint, outputFormat);
+            const roundedCurrent = roundCoordinateForFormat(currentPoint, outputFormat);
+            
+            const wouldCollide = roundedPrev.r === roundedCurrent.r && 
+                                roundedPrev.theta === roundedCurrent.theta;
+            
+            if (wouldCollide && !isIntentionalPenUp) {
+                // This is an unintentional duplicate due to rounding - remove it
+                console.log(`Removing unintentional duplicate at index ${i} due to rounding collision`);
+                removedCount++;
+                continue;
+            }
+        }
+        
+        // Keep this point
+        cleanedPoints.push(currentPoint);
+        
+        // If this was an intentional pen-up, update its index in the cleaned array
+        if (isIntentionalPenUp) {
+            cleanedIntentionalIndices.add(cleanedPoints.length - 1);
+        }
+    }
+    
+    if (removedCount > 0) {
+        console.log(`Removed ${removedCount} unintentional duplicates due to rounding collisions`);
+    }
+    
+    return { 
+        polarPoints: cleanedPoints, 
+        intentionalPenUpIndices: cleanedIntentionalIndices 
     };
 }
 
@@ -216,19 +327,17 @@ function _formatCoordinates(polarPoints, outputFormat = 0){
     switch (outputFormat) {
         case 0: //Default
             // For Image2Sand.ino code, we normalize the theta values
-            // We'll use modulo for this format
             formattedPolarPoints = polarPoints.map(p => {
-            const normalizedTheta = ((p.theta % 3600) + 3600) % 3600; // Ensure positive value between 0-3600
-            return `{${p.r.toFixed(0)},${normalizedTheta.toFixed(0)}}`;
-        }).join(',');
+                const rounded = roundCoordinateForFormat(p, outputFormat);
+                return `{${rounded.r},${rounded.theta}}`;
+            }).join(',');
             break;
 
         case 1: //Single Byte
             // For single byte format, we need to normalize the theta values
-            // We'll use modulo for this format since it's just for Arduino code
             formattedPolarPoints = polarPoints.map(p => {
-                const normalizedTheta = ((p.theta % 3600) + 3600) % 3600; // Ensure positive value between 0-3600
-                return `{${Math.round(255 * p.r / 1000)},${Math.round(255 * normalizedTheta / 3600)}}`;
+                const rounded = roundCoordinateForFormat(p, outputFormat);
+                return `{${rounded.r},${rounded.theta}}`;
             }).join(',');
             break;
 
@@ -237,18 +346,16 @@ function _formatCoordinates(polarPoints, outputFormat = 0){
             // Convert from tenths of degrees back to radians
             // Apply a 90° clockwise rotation by subtracting π/2 (900 in tenths of degrees) from theta
             formattedPolarPoints = polarPoints.map(p => {
-                // Subtract 900 (90 degrees) to rotate clockwise
-                const rotatedTheta = p.theta - 900;
-                return `${(-rotatedTheta * Math.PI / 1800).toFixed(5)} ${(p.r / 1000).toFixed(5)}`;
+                const rounded = roundCoordinateForFormat(p, outputFormat);
+                return `${rounded.theta} ${rounded.r}`;
             }).join("\n");
             break;
 
         case 3: // whitespace (might cause problems as it outputs a space)
             // For whitespace format, we need to normalize the theta values
-            // We'll use modulo for this format
             formattedPolarPoints = polarPoints.map(p => {
-                const normalizedTheta = ((p.theta % 3600) + 3600) % 3600; // Ensure positive value between 0-3600
-                return `${Math.round(255 * p.r / 1000).toString(2).padStart(8,'0').replaceAll('0',' ').replaceAll('1',"\t")}${Math.round(255 * normalizedTheta / 3600).toString(2).padStart(8,'0').replaceAll('0',' ').replaceAll('1',"\t")}`;
+                const rounded = roundCoordinateForFormat(p, outputFormat);
+                return `${rounded.r.toString(2).padStart(8,'0').replaceAll('0',' ').replaceAll('1',"\t")}${rounded.theta.toString(2).padStart(8,'0').replaceAll('0',' ').replaceAll('1',"\t")}`;
             }).join("\n");
             break;
 
@@ -259,45 +366,139 @@ function _formatCoordinates(polarPoints, outputFormat = 0){
     return formattedPolarPoints;
 }
 
+// Shared function to calculate polar coordinates with pen-ups, processing contours separately
+// This prevents theta normalization from making adjacent points at contour boundaries appear identical
+function calculatePolarCoordinatesWithPenUps(contours, pointTransform = null, isLoopEnabled = false) {
+    const intentionalPenUpIndices = new Set();
+    const allPolarPoints = [];
+    
+    // First, transform all points and calculate a common center from ALL points
+    const allTransformedPoints = [];
+    for (let i = 0; i < contours.length; i++) {
+        const transformedContour = pointTransform 
+            ? contours[i].map(p => pointTransform(p))
+            : contours[i];
+        allTransformedPoints.push(...transformedContour);
+    }
+    
+    // Calculate center from all points together (important for consistent scaling)
+    const center = findMaximalCenter(allTransformedPoints);
+    const maxRadius = Math.max(...allTransformedPoints.map(p => {
+        const dx = p.x - center.centerX;
+        const dy = p.y - center.centerY;
+        return Math.sqrt(dx * dx + dy * dy);
+    }));
+    
+    // Now process each contour separately for theta normalization
+    // This prevents theta normalization from affecting points across contour boundaries
+    for (let i = 0; i < contours.length; i++) {
+        const contour = contours[i];
+        
+        // Apply point transformation if provided (e.g., for scaling in drawDots)
+        const transformedContour = pointTransform 
+            ? contour.map(p => pointTransform(p))
+            : contour;
+        
+        // Calculate polar coordinates for this contour using the common center
+        const contourPoints = transformedContour.map(p => ({ 
+            x: p.x - center.centerX, 
+            y: p.y - center.centerY 
+        }));
+        
+        // Calculate initial angles for this contour
+        let contourPolarPoints = contourPoints.map(p => {
+            const r = Math.sqrt(p.x * p.x + p.y * p.y);
+            let theta = Math.atan2(p.y, p.x);
+            theta = -theta; // Flip y-axis
+            
+            return { 
+                r: r * (1000 / maxRadius), 
+                theta: theta,
+                x: p.x,
+                y: p.y
+            };
+        });
+        
+        // Process points to create continuous theta values WITHIN this contour
+        for (let j = 1; j < contourPolarPoints.length; j++) {
+            const prev = contourPolarPoints[j-1];
+            const curr = contourPolarPoints[j];
+            
+            let diff = curr.theta - prev.theta;
+            if (diff > Math.PI) {
+                curr.theta -= 2 * Math.PI;
+            } else if (diff < -Math.PI) {
+                curr.theta += 2 * Math.PI;
+            }
+        }
+        
+        // Convert to degrees * 10
+        contourPolarPoints = contourPolarPoints.map(p => ({
+            r: p.r,
+            theta: p.theta * (1800 / Math.PI)
+        }));
+        
+        // Add points from this contour
+        allPolarPoints.push(...contourPolarPoints);
+        
+        // Add pen-up between contours (except after the last contour)
+        if (i < contours.length - 1) {
+            const lastPointOfContour = contourPolarPoints[contourPolarPoints.length - 1];
+            allPolarPoints.push(lastPointOfContour);
+            intentionalPenUpIndices.add(allPolarPoints.length - 1);
+        }
+    }
+    
+    // If loop drawing is enabled, add a pen-up command at the end
+    if (isLoopEnabled && allPolarPoints.length > 0) {
+        const lastPoint = allPolarPoints[allPolarPoints.length - 1];
+        allPolarPoints.push(lastPoint);
+        intentionalPenUpIndices.add(allPolarPoints.length - 1);
+    }
+    
+    return { polarPoints: allPolarPoints, intentionalPenUpIndices };
+}
+
 // Pure algorithmic function for calculating polar coordinates
 function _calculatePolarCoordinatesFromPoints(points, penUpEnabled = false, contours = null, isLoopEnabled = false) {
     let allPolarPoints = [];
+    let intentionalPenUpIndices = new Set(); // Track indices of intentional pen-ups
     
     if (penUpEnabled && contours) {
         // Pen-up mode: process contours individually to maintain structure
         console.log('Processing contours in pen-up mode. Number of contours:', contours.length);
         
-        // Calculate polar coordinates for ALL points together (maintains relationships)
-        allPolarPoints = calculatePolarCoordinates(points);
+        // Use shared function that processes contours separately
+        const result = calculatePolarCoordinatesWithPenUps(contours, null, isLoopEnabled);
+        allPolarPoints = result.polarPoints;
+        intentionalPenUpIndices = result.intentionalPenUpIndices;
+        
         console.log('Total polar points after processing:', allPolarPoints.length);
         
-        // Now insert pen-up commands between contours
-        let currentIndex = 0;
-        for (let i = 0; i < contours.length - 1; i++) {
-            const contourLength = contours[i].length;
-            currentIndex += contourLength;
-            
-            // Insert pen-up (repeat the last coordinate of this contour)
-            const penUpPoint = allPolarPoints[currentIndex - 1];
-            allPolarPoints.splice(currentIndex, 0, penUpPoint);
-            console.log(`Added pen-up after contour ${i} at index ${currentIndex}`);
-            currentIndex++; // Account for the inserted point
-        }
-        
-        // If loop drawing is enabled, add a pen-up command at the end to return to start
-        if (isLoopEnabled) {
-            const lastPoint = allPolarPoints[allPolarPoints.length - 1];
-            allPolarPoints.push(lastPoint);
-            console.log('Added pen-up at end for loop drawing');
-        }
+        // Output coordinate list BEFORE any pen-ups are added (for debugging)
+        // Note: pen-ups are already added by calculatePolarCoordinatesWithPenUps
+        console.log('=== COORDINATE LIST WITH PEN-UPS ===');
+        allPolarPoints.forEach((point, index) => {
+            const isPenUp = intentionalPenUpIndices.has(index);
+            const marker = isPenUp ? ' [PEN-UP]' : '';
+            console.log(`  [${index}] r=${point.r.toFixed(2)}, theta=${point.theta.toFixed(2)}${marker}`);
+        });
+        console.log('=== END COORDINATE LIST ===');
         
         console.log('Final total polar points with pen-up:', allPolarPoints.length);
     } else {
         // Normal mode: process flattened points
         allPolarPoints = calculatePolarCoordinates(points);
+        // No intentional pen-ups in normal mode
+        
+        // Output all points
+        console.log('All polar points (no pen-ups):');
+        allPolarPoints.forEach((point, index) => {
+            console.log(`  [${index}] r=${point.r.toFixed(2)}, theta=${point.theta.toFixed(2)}`);
+        });
     }
     
-    return allPolarPoints;
+    return { polarPoints: allPolarPoints, intentionalPenUpIndices };
 }
 
 // Polar coordinate calculation

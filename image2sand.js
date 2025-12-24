@@ -243,6 +243,7 @@ let isMagicMode = false;
 window.isMagicMode = false; // Make globally accessible for unified callbacks
 let currentStreamingPattern = null;
 let streamingProgress = { current: 0, total: 0, r: 0, theta: 0 };
+let currentPolarPoints = null; // Store current pattern points for slider control
 
 // Voice recognition state management
 let isStreaming = false;
@@ -3530,7 +3531,7 @@ function drawDots(points, penUpEnabled = false, contours = null) {
     if (penUpEnabled && contours) {
         console.log('Processing contours in pen-up mode. Number of contours:', contours.length);
         
-        const allScaledPoints = [];
+        // Draw dots on canvas for each contour
         for (let i = 0; i < contours.length; i++) {
             const contour = contours[i];
             console.log(`Processing contour ${i}:`, contour.length, 'points');
@@ -3545,31 +3546,20 @@ function drawDots(points, penUpEnabled = false, contours = null) {
                 ctx.arc(point.x, point.y, 2, 0, 2 * Math.PI);
                 ctx.fill();
             });
-            
-            allScaledPoints.push(...scaledContour);
         }
         
-        allPolarPoints = calculatePolarCoordinates(allScaledPoints);
-        console.log('Total polar points after processing:', allPolarPoints.length);
-        
-        let currentIndex = 0;
-        for (let i = 0; i < contours.length - 1; i++) {
-            const contourLength = contours[i].length;
-            currentIndex += contourLength;
-            
-            const penUpPoint = allPolarPoints[currentIndex - 1];
-            allPolarPoints.splice(currentIndex, 0, penUpPoint);
-            console.log(`Added pen-up after contour ${i} at index ${currentIndex}`);
-            currentIndex++;
-        }
+        // Use shared function to calculate polar coordinates with pen-ups
+        // Pass a transformation function to scale points for display
+        const pointTransform = (p) => ({
+            x: (p.x) * scale + offsetX,
+            y: (p.y) * scale + offsetY
+        });
         
         const isLoopEnabled = document.getElementById('is-loop').checked;
-        if (isLoopEnabled) {
-            const lastPoint = allPolarPoints[allPolarPoints.length - 1];
-            allPolarPoints.push(lastPoint);
-            console.log('Added pen-up at end for loop drawing');
-        }
+        const result = calculatePolarCoordinatesWithPenUps(contours, pointTransform, isLoopEnabled);
+        allPolarPoints = result.polarPoints;
         
+        console.log('Total polar points after processing:', allPolarPoints.length);
         console.log('Final total polar points with pen-up:', allPolarPoints.length);
     } else {
         const scaledPoints = points.map(p => ({ x: (p.x) * scale + offsetX, y: (p.y) * scale + offsetY }));
@@ -3586,7 +3576,10 @@ function drawDots(points, penUpEnabled = false, contours = null) {
     return allPolarPoints;
 }
 
-function drawConnections(polarPoints) {
+function drawConnections(polarPoints, pointCount = null) {
+    // Store points globally for slider access
+    currentPolarPoints = polarPoints;
+    
     const canvas = document.getElementById('connect-image'), ctx = canvas.getContext('2d');
     
     // Reset transformation matrix first, then clear
@@ -3606,9 +3599,41 @@ function drawConnections(polarPoints) {
     ctx.stroke();
 
     const penUpEnabled = document.getElementById('pen-up-toggle').checked;
+    const tolerance = 0.1;
 
-    console.log('Drawing connections for', polarPoints.length, 'points');
-    for (let i = 0; i < polarPoints.length - 1; i++) {
+    // Calculate how many points to draw
+    const totalPoints = polarPoints.length;
+    const pointsToDraw = pointCount !== null ? Math.min(pointCount, totalPoints) : totalPoints;
+    
+    // Update slider max and value
+    const slider = document.getElementById('pattern-progress-slider');
+    const label = document.getElementById('pattern-progress-label');
+    const coordDisplay = document.getElementById('pattern-progress-coord');
+    if (slider) {
+        slider.max = totalPoints;
+        slider.value = pointsToDraw;
+    }
+    if (label) {
+        label.textContent = `${pointsToDraw} / ${totalPoints} points`;
+    }
+    if (coordDisplay && pointsToDraw > 0) {
+        // Get the last coordinate being rendered (index pointsToDraw - 1)
+        const lastPoint = polarPoints[pointsToDraw - 1];
+        if (lastPoint) {
+            coordDisplay.textContent = `R=${lastPoint.r.toFixed(0)}, θ=${lastPoint.theta.toFixed(0)}`;
+        } else {
+            coordDisplay.textContent = 'R=0, θ=0';
+        }
+    } else if (coordDisplay) {
+        coordDisplay.textContent = 'R=0, θ=0';
+    }
+    
+    // We draw segments from 0 to (pointsToDraw - 2), which means we include points up to index (pointsToDraw - 1)
+    // If pointsToDraw = 100, we draw segments 0-98 (99 segments), which includes points 0-99
+    const endSegmentIndex = Math.max(0, Math.min(pointsToDraw - 1, totalPoints - 1));
+
+    console.log('Drawing connections for', pointsToDraw, 'of', polarPoints.length, 'points');
+    for (let i = 0; i < endSegmentIndex; i++) {
         const p1 = polarPoints[i];
         const p2 = polarPoints[i + 1];
         
@@ -3622,25 +3647,24 @@ function drawConnections(polarPoints) {
         const x2 = p2.r * Math.cos(theta2) * scale;
         const y2 = -p2.r * Math.sin(theta2) * scale;
 
-        let isPenUp = false;
+        // Always detect pen lifts (repeat coordinates) regardless of checkbox state
+        const isPenUp = (Math.abs(p1.r - p2.r) < tolerance && Math.abs(p1.theta - p2.theta) < tolerance);
+        if (isPenUp) {
+            console.log(`Pen-up detected at segment ${i}:`, p1, p2);
+            console.log(`Skipping line between repeated coordinates`);
+            continue;
+        }
+        
+        // Check if current point (p1) is a duplicate of the previous point (pen-up marker)
+        // This handles the case where we have [A, B, C, C, D] - we should skip or draw light grey from second C to D
         let shouldDrawLightGrey = false;
-        if (penUpEnabled) {
-            const tolerance = 0.1;
-            isPenUp = (Math.abs(p1.r - p2.r) < tolerance && Math.abs(p1.theta - p2.theta) < tolerance);
-            if (isPenUp) {
-                console.log(`Pen-up detected at segment ${i}:`, p1, p2);
-                console.log(`Skipping line between repeated coordinates`);
-                continue;
-            }
-            
-            if (i > 0) {
-                const prevP1 = polarPoints[i-1];
-                const prevP2 = polarPoints[i];
-                const prevIsPenUp = (Math.abs(prevP1.r - prevP2.r) < tolerance && Math.abs(prevP1.theta - prevP2.theta) < tolerance);
-                if (prevIsPenUp) {
-                    shouldDrawLightGrey = true;
-                    console.log(`Drawing light grey line from pen-up to next coordinate`);
-                }
+        if (i > 0) {
+            const prevPoint = polarPoints[i - 1];
+            const isCurrentPointPenUp = (Math.abs(p1.r - prevPoint.r) < tolerance && Math.abs(p1.theta - prevPoint.theta) < tolerance);
+            if (isCurrentPointPenUp) {
+                // Current point is a pen-up marker (duplicate), so draw light grey line to next point
+                shouldDrawLightGrey = true;
+                console.log(`Drawing light grey line from pen-up marker to next coordinate`);
             }
         }
 
@@ -3698,7 +3722,8 @@ function convertImage() {
         minimizeJumps: document.getElementById('no-shortcuts').checked,
         outputFormat: parseInt(document.getElementById('output-type').value),
         maxPoints: parseInt(document.getElementById('dot-number').value),
-        penUpEnabled: document.getElementById('pen-up-toggle').checked
+        penUpEnabled: document.getElementById('pen-up-toggle').checked,
+        addInterpolatedPoints: document.getElementById('add-interpolated-points').checked
     };
     
     setTimeout(() => {
@@ -3721,7 +3746,22 @@ function convertImage() {
                 orderedContoursSave = result.processedContours;
                 
                 const penUpEnabled = document.getElementById('pen-up-toggle').checked;
+                
+                // Debug: Check what polarPoints we got from processing
+                console.log('=== POLAR POINTS FROM PROCESSING ===');
+                console.log(`Total points: ${result.polarPoints.length}`);
+                result.polarPoints.forEach((p, i) => {
+                    console.log(`  [${i}] r=${p.r.toFixed(2)}, theta=${p.theta.toFixed(2)}`);
+                });
+                
                 const displayPolarPoints = drawDots(result.orderedPoints, penUpEnabled, result.processedContours);
+                
+                // Debug: Check what drawDots returned
+                console.log('=== POLAR POINTS FROM drawDots ===');
+                console.log(`Total points: ${displayPolarPoints.length}`);
+                displayPolarPoints.forEach((p, i) => {
+                    console.log(`  [${i}] r=${p.r.toFixed(2)}, theta=${p.theta.toFixed(2)}`);
+                });
                 
                 drawConnections(displayPolarPoints);
                 
@@ -4063,6 +4103,36 @@ document.addEventListener('DOMContentLoaded', function() {
         epsilonSlider.addEventListener('input', () => {
             epsilonValueDisplay.textContent = epsilonSlider.value;
         });
+    }
+    
+    // Set up pattern progress slider
+    const patternProgressSlider = document.getElementById('pattern-progress-slider');
+    if (patternProgressSlider) {
+        patternProgressSlider.addEventListener('input', () => {
+            const pointCount = parseInt(patternProgressSlider.value);
+            if (currentPolarPoints && currentPolarPoints.length > 0) {
+                drawConnections(currentPolarPoints, pointCount);
+            }
+        });
+    }
+    
+    // Set up output-type dropdown to auto-check interpolation when theta-rho is selected
+    const outputTypeSelect = document.getElementById('output-type');
+    const addInterpolatedPointsCheckbox = document.getElementById('add-interpolated-points');
+    if (outputTypeSelect && addInterpolatedPointsCheckbox) {
+        // Function to update interpolation checkbox based on output format
+        const updateInterpolationCheckbox = () => {
+            const outputFormat = parseInt(outputTypeSelect.value);
+            if (outputFormat === 2) { // Theta-Rho format
+                addInterpolatedPointsCheckbox.checked = true;
+            }
+        };
+        
+        // Set up change listener
+        outputTypeSelect.addEventListener('change', updateInterpolationCheckbox);
+        
+        // Check on initial load if theta-rho is already selected
+        updateInterpolationCheckbox();
     }
     
     // Set up prerequisites checking for Magic Mode
