@@ -21,6 +21,9 @@ INCLUDED LIBRARIES
 // Enable Voice2Sand - Drawing images streamed to the sand garden
 #define ENABLE_STREAMING_PATTERN false   // Enable pattern_Remote (streaming coordinates via serial)
 
+#define USE_LED_CIRCLE true //Circular LED display - Set this to true if you have connected a circular LED display under the sand.
+//You will also need to set the constants in the LED CIRCLE block about 250 lines below.
+
 // Autostart configuration
 #define AUTO_START_PATTERN false          // Set to true to autostart the pattern on power-up. Set to false for pattern selection mode.
 
@@ -200,11 +203,6 @@ static const Positions patternJ[] PROGMEM = {
   #define ENABLE_CUSTOM_PATTERN false
 #endif
 
-
-//Circular LED display - Set this to true if you have connected a circular LED display under the sand.
-//You will also need to set the constants in the LED CIRCLE block below.
-#define USE_LED_CIRCLE false
-
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /*
 PREPROCESSOR DIRECTIVES.
@@ -290,12 +288,18 @@ Useful values and limits for defining how the sand garden will behave. In most c
 #define LED_FADE_PERIOD  1000        //Amount of time in milliseconds it takes for LEDs to fade on and off.
 
 // ************ LED CIRCLE BLOCK - Set these paramaters if using a circle LED display ***********
+
+// Define IMAGE_SCALE_FACTOR with default value (will be overridden if USE_LED_CIRCLE is true)
+#ifndef IMAGE_SCALE_FACTOR
+  #define IMAGE_SCALE_FACTOR 1.0      //Scale factor to dilate the image, used to match the LED display. When not using it, set to 1.0 to avoid any scaling.
+#endif
+
 #if USE_LED_CIRCLE
   #define CIRCULAR_LED_PIN 2           //The output pin for the circular LED display.
   #define NUM_CIRCULAR_LEDS 241        //Number of LEDs in the circular display.
   #define NUM_LED_CIRCLES 9            //Number of concentric circles in the LED display
   #define THETA_OFFSET_JUMP_DEG 5      //Theta offset jump in degrees with left/right joystick press
-
+  #define IMAGE_SCALE_FACTOR 0.88      //Scale factor to dilate the image, used to match the LED display.
   int led_per_circle[NUM_LED_CIRCLES] = {60, 48, 40, 32, 24, 16, 12, 8, 1};   // Number of LEDs per circle on LED display (outermost to innermost)
   int thetaOffset = 0;                 // Theta offset between the Sand Image and the image on the LED display in degrees (-180 to +180) - can adjusted by joystick during drawing
   
@@ -307,10 +311,10 @@ Useful values and limits for defining how the sand garden will behave. In most c
     CRGB(255, 64, 0),     // Ring 1: Orange (Red + some Green)
     CRGB(255, 255, 0),    // Ring 2: RG (Red + Green = Yellow)
     CRGB(0, 255, 0),      // Ring 3: G (Green)
-    CRGB(0, 255, 255),    // Ring 4: GB (Green + Blue)
+    CRGB(0, 255, 255),    // Ring 4: GB (Green + Blue = Turquoise)
     CRGB(0, 0, 255),      // Ring 4: B (Blue)
-    CRGB(255, 0, 255),    // Ring 6: RB (Red + Blue)
-    CRGB(255, 0, 42)      // Ring 7: Dark Purple
+    CRGB(255, 0, 255),    // Ring 6: RB (Red + Blue = Purple)
+    CRGB(255, 0, 42)      // Ring 7: Magenta
   };
 
   CRGB circularLeds[NUM_CIRCULAR_LEDS];   //Circular LED display array
@@ -2389,8 +2393,8 @@ void clearLedCircleOnRestart(int& currentColorIndex, bool& colorInitialized) {
  */
 void updateLedCircleFromTarget(Positions target, int& currentColorIndex, bool& colorInitialized) {
   //Convert target position back to r,theta format and update circular LED for pattern drawing
-  //target.radial is in steps, convert back to 0-1000 range
-  int r = (int)((float)target.radial * 1000.0 / MAX_R_STEPS);
+  //target.radial is in steps, convert back to 0-1000 range (divide by IMAGE_SCALE_FACTOR to show original size on LED)
+  int r = (int)((float)target.radial * (1000.0 / MAX_R_STEPS) / IMAGE_SCALE_FACTOR);
   //target.angular is in steps, convert back to degrees*10 (0-3599)
   int theta = (int)(convertStepsToDegrees(target.angular) * 10.0);
   
@@ -2453,8 +2457,8 @@ Positions drawPictureStep(Positions *pointList, int nodes, Positions current, bo
     changePoints = false;
   }
 
-  Positions startPoint = { (int)(readStart.radial * (float)MAX_R_STEPS/1000), (int)convertDegreesToSteps((float)(readStart.angular)/10) };
-  Positions endPoint = { (int)(readEnd.radial * (float)MAX_R_STEPS/1000), (int)convertDegreesToSteps((float)(readEnd.angular)/10) };
+  Positions startPoint = { (int)(readStart.radial * (float)MAX_R_STEPS/1000 * IMAGE_SCALE_FACTOR), (int)convertDegreesToSteps((float)(readStart.angular)/10) };
+  Positions endPoint = { (int)(readEnd.radial * (float)MAX_R_STEPS/1000 * IMAGE_SCALE_FACTOR), (int)convertDegreesToSteps((float)(readEnd.angular)/10) };
 
   target = drawLine(startPoint, endPoint, current, 100);
 
@@ -2659,8 +2663,8 @@ Positions pattern_Remote(Positions current, bool restartPattern = false) {
     }
   }
 
-  Positions startPoint = { (int)(startPos.radial * (float)MAX_R_STEPS/1000), (int)convertDegreesToSteps((float)(startPos.angular)/10) };
-  Positions endPoint = { (int)(endPos.radial * (float)MAX_R_STEPS/1000), (int)convertDegreesToSteps((float)(endPos.angular)/10) };
+  Positions startPoint = { (int)(startPos.radial * (float)MAX_R_STEPS/1000 * IMAGE_SCALE_FACTOR), (int)convertDegreesToSteps((float)(startPos.angular)/10) };
+  Positions endPoint = { (int)(endPos.radial * (float)MAX_R_STEPS/1000 * IMAGE_SCALE_FACTOR), (int)convertDegreesToSteps((float)(endPos.angular)/10) };
   if (!starting) {
     target = drawLine(startPoint, endPoint, current, 100);
   } else {
