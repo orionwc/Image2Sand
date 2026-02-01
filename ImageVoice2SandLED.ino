@@ -34,6 +34,10 @@ INCLUDED LIBRARIES
 // Pattern completion behavior
 #define PATTERN_LOOP_ON_COMPLETE false // Set to true to loop patterns continuously, false to stop and return to pattern selection when pattern completes
 
+// Pause after first point
+#define PAUSE_AFTER_START true          // Set to true to stop after reaching the first point and wait for joystick button press before continuing
+//Useful for clearing the sand after it gets to the first point, and rotating the LEDs to match the rotation using the joystick.
+
 // Note: When ENABLE_STREAMING_PATTERN is true, Serial communication is initialized at 9600 baud for receiving
 // coordinate data in the format <POS:r,theta> where r is 0-1000 and theta is angle in tenths of degrees (0-3600).
 
@@ -83,7 +87,7 @@ To add your own pattern:
 //=== ENABLE CUSTOM PATTERNS - Uncomment the patterns you want to include ===
 //=== If you want to use your own, leave this code as it is and ===
 //=== paste the pattern below the line "PASTE CUSTOM PATTERN HERE" in the section ENABLE_CUSTOM_PATTERN_A below ===
-//#define ENABLE_CUSTOM_PATTERN_A      // CrunchLabs Logo
+#define ENABLE_CUSTOM_PATTERN_A      // CrunchLabs Logo
 //#define ENABLE_CUSTOM_PATTERN_B      // Palm Tree
 //#define ENABLE_CUSTOM_PATTERN_C      // Mountains
 #define ENABLE_CUSTOM_PATTERN_D      // Fir Tree
@@ -119,16 +123,9 @@ struct LEDpos {
 // More patterns available at https://github.com/orionwc/Image2Sand/blob/main/CommunityPatterns.txt
 
 #ifdef ENABLE_CUSTOM_PATTERN_A
-// Pattern A: CrunchLabs Logo
-static const Positions patternA[] PROGMEM = {
-
-  // If you have a custom pattern from the Image2Sand Website, 
-  // comment out the pattern directly below this line by inserting // in front of it, 
-  // and paste the new pattern below it:
-  {239,1834},{312,2560},{321,2598},{536,3239},{565,3249},{589,3242},{620,3209},{623,3106},{622,3027},{625,2934},{624,2843},{619,2767},{627,2758},{627,2642},{618,2597},{625,2581},{617,2571},{645,2513},{680,2486},{986,2410},{998,2416},{992,2484},{1000,2498},{1000,2566},{992,2634},{1000,2640},{999,2752},{999,2880},{998,2994},{998,3116},{996,3203},{997,3304},{998,3363},{999,3442},{996,3556},{999,79},{998,202},{997,300},{998,423},{997,507},{996,630},{998,754},{996,869},{996,953},{996,1048},{996,1162},{997,1272},{996,1384},{997,1483},{997,1615},{997,1719},{999,1861},{999,1982},{996,2083},{988,2086},{658,1997},{617,1934},{626,1859},{623,1767},{623,1625},{621,1471},{620,1390},{620,1275},{623,1157},{624,1073},{623,978},{622,857},{623,763},{622,680},{622,600},{621,519},{620,391},{599,361},{561,351},{320,996},{298,1072},{233,1703}
-
-// *********** PASTE CUSTOM PATTERN HERE (and comment out line above) ********************
-
+// Pattern A: CrunchLabs Logo (LEDpos format, type 0 = marble, all red for now)
+static const LEDpos patternA[] PROGMEM = {
+  {{996,953}, 0, {255,0,0}}, {{996,1048}, 0, {255,0,0}}, {{996,1162}, 0, {255,0,0}}, {{997,1272}, 0, {255,0,0}}, {{996,1384}, 0, {255,0,0}}, {{997,1483}, 0, {255,0,0}}, {{997,1615}, 0, {255,0,0}}, {{997,1719}, 0, {255,0,0}}, {{999,1861}, 0, {255,0,0}}, {{999,1982}, 0, {255,0,0}}, {{997,2069}, 0, {255,0,0}}, {{988,2086}, 0, {255,0,0}}, {{658,1997}, 0, {255,0,0}}, {{617,1934}, 0, {255,0,0}}, {{626,1859}, 0, {255,0,0}}, {{623,1767}, 0, {255,0,0}}, {{623,1625}, 0, {255,0,0}}, {{621,1471}, 0, {255,0,0}}, {{620,1275}, 0, {255,0,0}}, {{623,1157}, 0, {255,0,0}}, {{624,1073}, 0, {255,0,0}}, {{623,978}, 0, {255,0,0}}, {{622,857}, 0, {255,0,0}}, {{622,680}, 0, {255,0,0}}, {{621,519}, 0, {255,0,0}}, {{620,391}, 0, {255,0,0}}, {{599,361}, 0, {255,0,0}}, {{561,351}, 0, {255,0,0}}, {{320,996}, 0, {255,0,0}}, {{298,1072}, 0, {255,0,0}}, {{233,1703}, 0, {255,0,0}}, {{239,1834}, 0, {255,0,0}}, {{279,2482}, 0, {255,0,0}}, {{321,2598}, 0, {255,0,0}}, {{536,3239}, 0, {255,0,0}}, {{589,3242}, 0, {255,0,0}}, {{620,3209}, 0, {255,0,0}}, {{623,3106}, 0, {255,0,0}}, {{625,2934}, 0, {255,0,0}}, {{627,2758}, 0, {255,0,0}}, {{627,2642}, 0, {255,0,0}}, {{617,2571}, 0, {255,0,0}}, {{645,2513}, 0, {255,0,0}}, {{680,2486}, 0, {255,0,0}}, {{986,2410}, 0, {255,0,0}}, {{998,2416}, 0, {255,0,0}}, {{1000,2566}, 0, {255,0,0}}, {{1000,2640}, 0, {255,0,0}}, {{999,2752}, 0, {255,0,0}}, {{999,2880}, 0, {255,0,0}}, {{998,2994}, 0, {255,0,0}}, {{998,3116}, 0, {255,0,0}}, {{996,3203}, 0, {255,0,0}}, {{997,3304}, 0, {255,0,0}}, {{999,3442}, 0, {255,0,0}}, {{996,3556}, 0, {255,0,0}}, {{999,79}, 0, {255,0,0}}, {{998,202}, 0, {255,0,0}}, {{997,300}, 0, {255,0,0}}, {{998,423}, 0, {255,0,0}}, {{997,507}, 0, {255,0,0}}, {{996,630}, 0, {255,0,0}}, {{998,754}, 0, {255,0,0}}, {{996,869}, 0, {255,0,0}}
 };
 #endif
 
@@ -167,9 +164,9 @@ static const Positions patternC[] PROGMEM = {
 // Pattern D: Fir Tree
 static const LEDpos patternD[] PROGMEM = {
   //{339,3441},{344,3457},{452,3446},{491,3459},{525,3495},{523,3536},{302,383},{408,303},{431,306},{452,335},{488,710},{482,731},{496,723},{519,662},{548,650},{586,664},{743,865},{921,935},{787,994},{661,1206},{616,1228},{579,1220},{542,1182},{519,1493},{510,1525},{470,1540},{386,1491},{573,1880},{574,1918},{552,1940},{444,1924},{438,1940},{774,2108},{774,2127},{746,2146},{586,2199},{583,2212},{966,2231},{1000,2241},{991,2262},{957,2280},{761,2375},{615,2558},{774,2592},{874,2586},{941,2569},{910,2741},{935,2808},{929,2820},{860,2790},{741,2767},{650,2757},{597,2767},{643,2893},{925,3118},{983,3161},{972,3176},{728,3155},{513,3138},{515,3153},{658,3229},{725,3266},{742,3289},{732,3301}
-  {{1000, 0}, 0, {255, 0, 0}}, {{1000, 900}, 0, {255, 255, 0}}, {{1000, 1800}, 0, {0, 255, 0}}, {{1000, 2700}, 0, {0, 255, 255}},
+  {{1000, 0}, 0, {255, 0, 0}}, {{1000, 900}, 0, {255, 255, 0}}, {{1000, 1800}, 0, {0, 255, 0}}, {{1000, 2700}, 0, {0, 255, 255}}, {{1000, 0}, 0, {0, 0, 0}},
   {{750, 0}, 1, {255, 0, 0}}, {{750, 900}, 1, {255, 255, 0}}, {{750, 1800}, 1, {0, 255, 0}}, {{750, 2700}, 1, {0, 255, 255}},
-  {{500, 0}, 2, {0, 0, 255}}, {{500, 900}, 2, {255, 0, 255}}, {{500, 1800}, 2, {255, 255, 255}}, {{500, 2700}, 2, {0, 0, 0}} // Square
+  {{500, 0}, 2, {0, 0, 255}}, {{500, 900}, 2, {255, 0, 255}}, {{500, 1800}, 2, {255, 255, 255}}, {{500, 2700}, 2, {150, 150, 100}} // Square
 };
 #endif
 
@@ -341,6 +338,7 @@ Useful values and limits for defining how the sand garden will behave. In most c
   };
 
   CRGB circularLeds[NUM_CIRCULAR_LEDS];   //Circular LED display array
+  uint8_t lastCircularLedColorR = 255, lastCircularLedColorG = 255, lastCircularLedColorB = 255;  // Last color used for circular LED (for re-light after theta change)
 
 #endif
 
@@ -519,6 +517,7 @@ These flags are used in that state machine.
 
 int currentPattern = 1;           // default to pattern 1 (streaming if enabled, otherwise first custom pattern or SimpleSpiral). Change to desired pattern number for autostart.
 bool runPattern = AUTO_START_PATTERN;          // Set to true to autostart the pattern on power-up. Set to false for pattern selection mode.
+bool pausedAfterFirstPoint = false;            // When PAUSE_AFTER_START is true, set after first point; cleared when user presses button to continue
 bool buttonShortPressed = false;  //button pressed state flag.
 bool buttonLongPressed = false;   //for indicating long press
 bool autoMode = true;             //tracking if we're in automatic or manual mode. Defaults to auto on startup. If you want to start in manual drawing mode, set this to false.
@@ -605,7 +604,7 @@ public:
  * @note The .fadePixels() method can be used to make the LEDs fade, indicating that the machine is running a pattern. This function 
  * uses bitwise operations to determine the LED pattern, lighting the LEDs in MediumVioletRed for non-manual patterns.
  */
-  void indicatePattern(uint8_t value) {                     //used for showing which pattern is selected
+  void indicatePattern(uint8_t value, bool doShow = true) {   //used for showing which pattern is selected
     //Clear only the LED bar, not all LEDs (to preserve circular LED display)
     for (int i = 0; i < NUM_LEDS; i++) {
       leds[i] = CRGB::Black;
@@ -619,7 +618,14 @@ public:
         }
       }
     }
-    FastLED.show();                                         //display the LEDs
+    if (doShow) FastLED.show();
+  }
+
+  /** Scale selector bar pixel values (so effective brightness = scale when global brightness is 255). */
+  void scaleSelectorBar(uint8_t scale) {
+    for (int i = 0; i < NUM_LEDS; i++) {
+      leds[i].nscale8(scale);
+    }
   }
 
   /**
@@ -654,6 +660,24 @@ public:
     FastLED.show();
   }
 
+  /**
+   * @brief Fades only the selector bar (0 to maxBrightness). Does not change global brightness so circle stays static.
+   */
+  void fadeSelectorPixelsOnly(unsigned long period, uint8_t maxBrightness) {
+    unsigned long currentTime = millis();
+    unsigned long timeInCycle = currentTime % period;
+    unsigned long halfPeriod = period / 2;
+    int brightness;
+    if (timeInCycle < halfPeriod) {
+      brightness = map(timeInCycle, 0, halfPeriod, 0, maxBrightness);
+    } else {
+      brightness = map(timeInCycle, halfPeriod, period, maxBrightness, 0);
+    }
+    for (int i = 0; i < NUM_LEDS; i++) {
+      leds[i].nscale8((uint8_t)constrain(brightness, 0, 255));
+    }
+    FastLED.show();
+  }
 
 /**
  * @brief Animates an LED bouncing pattern during the homing process and flashes green when homing is complete.
@@ -754,9 +778,14 @@ void setup() {
   pinMode(JOYSTICK_R_PIN, INPUT);
 
   //Set up the button.
-  //Single press of button is for starting or stopping the current pattern.
+  //Single press of button is for starting or stopping the current pattern (or continuing after PAUSE_AFTER_START).
   button.attachClick([]() {       //This is called a lambda function. Basically it's a nameless function that runs when the button is single pressed.
-    runPattern = !runPattern;     //this flips the boolean state of the variable. If it's true, this sets to false, if false set to true.
+    if (pausedAfterFirstPoint) {
+      pausedAfterFirstPoint = false;
+      runPattern = true;         // Continue pattern after pause-after-first-point
+    } else {
+      runPattern = !runPattern;  // Toggle run/stop
+    }
   });
 
   //Attaching an event to the long press of the button. Currently, long pressing the button lets you end the homing process early.
@@ -812,8 +841,15 @@ void loop() {
       #pragma region ManualMode
 
       //Use the LEDs to indicate that we are in manual drawing mode
+#if USE_LED_CIRCLE
+      display.setBrightness(255);               // circle at max
+      display.indicatePattern(255, false);
+      display.scaleSelectorBar(MAX_BRIGHTNESS); // selector unchanged (effective 40)
+      FastLED.show();
+#else
       display.setBrightness(MAX_BRIGHTNESS);
       display.indicatePattern(255);             //pattern 255 is used to indicate manual drawing mode on the LEDs
+#endif
 
       joystickValues = readJoystick();          //read joystick values and store them in joystickValues struct
       //first check if an angular change is requested by joystick input
@@ -843,8 +879,15 @@ void loop() {
     } else {                                        //automatic pattern mode
       #pragma region AutomaticMode
       //update the LED pattern display
-      display.setBrightness(MAX_BRIGHTNESS);       
-      display.indicatePattern(currentPattern);     
+#if USE_LED_CIRCLE
+      display.setBrightness(255);               // circle at max
+      display.indicatePattern(currentPattern, false);
+      display.scaleSelectorBar(MAX_BRIGHTNESS); // selector unchanged (effective 40)
+      FastLED.show();
+#else
+      display.setBrightness(MAX_BRIGHTNESS);
+      display.indicatePattern(currentPattern);
+#endif     
       
       //check to see if the pattern has been switched
       if (currentPattern != lastPattern) {
@@ -872,12 +915,9 @@ void loop() {
           if (thetaOffset < 0) {
             thetaOffset += 3600;
           }
-          //Clear LEDs when offset actually changes
+          //Clear LEDs when offset actually changes, then re-light the current position with the new offset
           if (thetaOffset != oldThetaOffset) {
-            for (int i = 0; i < NUM_CIRCULAR_LEDS; i++) {
-              circularLeds[i] = CRGB::Black;
-            }
-            FastLED.show();
+            clearCircularLedsAndRelightCurrentPosition();
           }
         }
       }
@@ -901,7 +941,7 @@ void loop() {
     #pragma endregion Running
 
 
-  } else {    //In this case, runPattern is false, which means this is pattern selection mode
+  } else {    //In this case, runPattern is false, which means this is pattern selection mode (or paused after first point for calibration)
     #pragma region SelectionMode
 
     //if the motors are enabled, disable them to save power while they don't need to run
@@ -914,9 +954,39 @@ void loop() {
     //read the joystick state so that it can be used in the following if statements
     joystickValues = readJoystick();
 
+#if USE_LED_CIRCLE && PAUSE_AFTER_START
+    // When paused after first point (calibration), allow left/right to adjust theta offset for LED alignment
+    if (pausedAfterFirstPoint) {
+      if (lastJoystickUpdate >= 200) {  //Debounce joystick input
+        int oldThetaOffset = thetaOffset;
+        if (joystickValues.angular >= 90) {  //Joystick pushed right
+          thetaOffset += THETA_OFFSET_JUMP_DEG * 10;  //Add theta offset jump
+          lastJoystickUpdate = 0;
+        } else if (joystickValues.angular <= -90) {  //Joystick pushed left
+          thetaOffset -= THETA_OFFSET_JUMP_DEG * 10;  //Subtract theta offset jump
+          lastJoystickUpdate = 0;
+        }
+        //Sanitize theta offset to 0-3600 range
+        thetaOffset = thetaOffset % 3600;
+        if (thetaOffset < 0) {
+          thetaOffset += 3600;
+        }
+        //Clear LEDs when offset actually changes, then re-light the current position with the new offset
+        if (thetaOffset != oldThetaOffset) {
+          clearCircularLedsAndRelightCurrentPosition();
+        }
+      }
+    } else
+#endif
+
     if (!autoMode) {                                        //This means we're not in automatic mode, so we are in manual drawing mode.
       display.indicatePattern(255);                         //The value 255 is used to represent manual mode on the LEDs.
+#if USE_LED_CIRCLE
+      display.setBrightness(255);                           // circle at max and static (fadeSelectorPixelsOnly does not change it)
+      display.fadeSelectorPixelsOnly(LED_FADE_PERIOD, MAX_BRIGHTNESS);  // selector pulses; circle stays static
+#else
       display.fadePixels(LED_FADE_PERIOD, MAX_BRIGHTNESS);  //update the brightness of the LEDs to fade them in and out over time
+#endif
 
       if (lastJoystickUpdate >= 200 && (joystickValues.angular >= 90 || joystickValues.angular <= -90)) {  //the joystick is pushed all the way to the right or left
         autoMode = true;                                    //switch to automatic mode so that we can do pattern selection
@@ -924,7 +994,12 @@ void loop() {
       }
     } else {                                                //We're in automatic mode, which means it's time to select a pattern.
       display.indicatePattern(currentPattern);
-      display.fadePixels(LED_FADE_PERIOD, MAX_BRIGHTNESS);  
+#if USE_LED_CIRCLE
+      display.setBrightness(255);                           // circle at max and static
+      display.fadeSelectorPixelsOnly(LED_FADE_PERIOD, MAX_BRIGHTNESS);  // selector pulses; circle stays static
+#else
+      display.fadePixels(LED_FADE_PERIOD, MAX_BRIGHTNESS);
+#endif  
 
       if (lastJoystickUpdate >= 200 && joystickValues.radial >= 90) {                              //if it's been 200ms since last joystick update and joystick is pushed all the way up
         currentPattern++;                                                                          //increment pattern number by 1
@@ -2437,6 +2512,9 @@ void updateLedCircleFromTarget(Positions target, int& currentColorIndex, bool& c
       colorInitialized = true;
     }
     circularLeds[ledNumber] = image_led_colors[currentColorIndex];
+    lastCircularLedColorR = image_led_colors[currentColorIndex].r;
+    lastCircularLedColorG = image_led_colors[currentColorIndex].g;
+    lastCircularLedColorB = image_led_colors[currentColorIndex].b;
     FastLED.show();
   }
 }
@@ -2464,8 +2542,25 @@ void setLedAtPosition(int r, int theta, uint8_t red, uint8_t green, uint8_t blue
   
   if (ledNumber >= 0 && ledNumber < NUM_CIRCULAR_LEDS) {
     circularLeds[ledNumber] = CRGB(red, green, blue);
+    lastCircularLedColorR = red;
+    lastCircularLedColorG = green;
+    lastCircularLedColorB = blue;
     FastLED.show();
   }
+}
+
+/**
+ * @brief Clears all circular LEDs and re-lights the current gantry position with the last color.
+ * Call after theta offset changes so the user sees the current point at the new offset.
+ */
+void clearCircularLedsAndRelightCurrentPosition(void) {
+  for (int i = 0; i < NUM_CIRCULAR_LEDS; i++) {
+    circularLeds[i] = CRGB::Black;
+  }
+  FastLED.show();
+  int r = (int)((float)currentPositions.radial * (1000.0 / MAX_R_STEPS) / IMAGE_SCALE_FACTOR);
+  int theta = (int)(convertStepsToDegrees(currentPositions.angular) * 10.0);
+  setLedAtPosition(r, theta, lastCircularLedColorR, lastCircularLedColorG, lastCircularLedColorB);
 }
 
 /**
@@ -2509,6 +2604,7 @@ Positions drawPictureStep(Positions *pointList, int nodes, Positions current, bo
   static int end = 1;
   static int previousStart = 0;  //Track previous start value to detect cycle completion
   static bool changePoints = true;
+  static bool calibrationDone = false;  // PAUSE_AFTER_START: true after first segment completion this run
   static Positions readStart = {0,0};
   static Positions readEnd = {pgm_read_word(&(pointList[0].radial)), pgm_read_word(&(pointList[0].angular))};
 #if USE_LED_CIRCLE
@@ -2518,6 +2614,11 @@ Positions drawPictureStep(Positions *pointList, int nodes, Positions current, bo
   
   uint16_t readValueR;
   uint16_t readValueA;
+
+  if (restartPattern) {
+    pausedAfterFirstPoint = false;
+    calibrationDone = false;
+  }
 
   if (changePoints) {
     readValueR = pgm_read_word(&(pointList[end].radial));
@@ -2531,7 +2632,6 @@ Positions drawPictureStep(Positions *pointList, int nodes, Positions current, bo
   Positions endPoint = { (int)(readEnd.radial * (float)MAX_R_STEPS/1000 * IMAGE_SCALE_FACTOR), (int)convertDegreesToSteps((float)(readEnd.angular)/10) };
 
   target = drawLine(startPoint, endPoint, current, 100);
-
 #if USE_LED_CIRCLE
   //Clear all circular LEDs and reset to white when a new pattern is selected
   if (restartPattern) {
@@ -2542,20 +2642,29 @@ Positions drawPictureStep(Positions *pointList, int nodes, Positions current, bo
   updateLedCircleFromTarget(target, currentColorIndex, colorInitialized);
 #endif
 
+#if PAUSE_AFTER_START
+  // Pause only when marble has physically arrived at the first coordinate (current position at startPoint)
+  if (start == 0 && !calibrationDone && current.radial == startPoint.radial && current.angular == startPoint.angular) {
+    calibrationDone = true;
+    runPattern = false;
+    pausedAfterFirstPoint = true;
+    return target;
+  }
+#endif
+
   if ((target.angular == endPoint.angular) && (target.radial == endPoint.radial)) {
     changePoints = true;
     start++;
     end++;
     
-    //Detect when pattern completes a full cycle (start wraps back to 0 from nodes-1)
-    //Before modulo: if previousStart was nodes-1 and start is now nodes, we've completed a cycle
-    bool patternCompleted = (previousStart == (nodes - 1) && start >= nodes);
+    // Completed when we've just reached the last point in the sequence (before looping back)
+    bool patternCompleted = (end == nodes);
     
     start = start % nodes;
     end = end % nodes;
     
 #if USE_LED_CIRCLE
-    //Cycle to next color when pattern completes a full cycle (don't clear - trace over existing pattern)
+    //Cycle to next color when pattern completes a full pass (don't clear - trace over existing pattern)
     if (patternCompleted) {
       if (colorInitialized) {
         currentColorIndex = (currentColorIndex + 1) % NUM_IMAGE_COLORS;  //Cycle to next color
@@ -2608,6 +2717,7 @@ Positions drawPictureStep(const LEDpos *ledPointList, int nodes, Positions curre
   uint16_t readValueR;
   uint16_t readValueA;
 
+  static bool calibrationDone = false;  // PAUSE_AFTER_START: true after first segment completion this run
   if (restartPattern) {
     start = 0;
     end = 1;
@@ -2615,6 +2725,8 @@ Positions drawPictureStep(const LEDpos *ledPointList, int nodes, Positions curre
     changePoints = true;
     readStart = {0,0};
     lastMarblePosition = current;
+    pausedAfterFirstPoint = false;
+    calibrationDone = false;
     // Clear all circular LEDs when restarting
     for (int i = 0; i < NUM_CIRCULAR_LEDS; i++) {
       circularLeds[i] = CRGB::Black;
@@ -2622,64 +2734,6 @@ Positions drawPictureStep(const LEDpos *ledPointList, int nodes, Positions curre
     FastLED.show();
   }
 
-  // Read current point to check its type
-  LEDpos currentLED = readLEDposFromPROGMEM(ledPointList, start);
-  
-  // Handle type 1 (fill point) or type 2 (detail point) - process immediately
-  if (currentLED.type == 1 || currentLED.type == 2) {
-    // Set LED at position with specified RGB color
-    int r = currentLED.pos.radial;
-    int theta = currentLED.pos.angular;
-    setLedAtPosition(r, theta, currentLED.color.r, currentLED.color.g, currentLED.color.b);
-    
-    // Select delay based on point type
-    unsigned long delayMs = (currentLED.type == 1) ? FILL_POINT_DELAY_MS : DETAIL_POINT_DELAY_MS;
-    
-    // Blocking delay with button checking
-    unsigned long startTime = millis();
-    while ((millis() - startTime) < delayMs && runPattern) {
-      button.tick();
-      delay(1);
-    }
-    
-    // Advance to next point (and detect completion)
-    bool patternCompleted = (start == (nodes - 1));
-    start++;
-    if (start >= nodes) start = 0;
-    end = (start + 1) % nodes;
-    previousStart = start;
-    changePoints = true;
-
-#if !PATTERN_LOOP_ON_COMPLETE
-    // If looping is disabled, stop pattern and return to selection mode when complete
-    if (patternCompleted) {
-      runPattern = false;
-    }
-#endif
-
-    return lastMarblePosition; // Return last marble position, don't move marble
-  }
-  
-  // Handle type 0 (marble point) - reuse original drawPictureStep logic
-  // If we reach here, type must be 0 (type 1/2 returned early above)
-  if (currentLED.type != 0) {
-    // Invalid type - skip this point and advance
-    bool patternCompleted = (start == (nodes - 1));
-    start++;
-    if (start >= nodes) start = 0;
-    end = (start + 1) % nodes;
-    previousStart = start;
-    changePoints = true;
-
-#if !PATTERN_LOOP_ON_COMPLETE
-    if (patternCompleted) {
-      runPattern = false;
-    }
-#endif
-
-    return current;
-  }
-  
   if (changePoints) {
     LEDpos startLED = readLEDposFromPROGMEM(ledPointList, start);
     LEDpos endLED = readLEDposFromPROGMEM(ledPointList, end);
@@ -2703,7 +2757,46 @@ Positions drawPictureStep(const LEDpos *ledPointList, int nodes, Positions curre
   Positions startPoint = { (int)(readStart.radial * (float)MAX_R_STEPS/1000 * IMAGE_SCALE_FACTOR), (int)convertDegreesToSteps((float)(readStart.angular)/10) };
   Positions endPoint = { (int)(readEnd.radial * (float)MAX_R_STEPS/1000 * IMAGE_SCALE_FACTOR), (int)convertDegreesToSteps((float)(readEnd.angular)/10) };
 
-  target = drawLine(startPoint, endPoint, current, 100);
+  // Check END point type: if end is type 1 or 2, set LED at end position only (do not move marble)
+  LEDpos endLED = readLEDposFromPROGMEM(ledPointList, end);
+  if (endLED.type == 1 || endLED.type == 2) {
+#if PAUSE_AFTER_START
+    // Pause when we're about to process the first point (index 0) as a fill/detail
+    if (end == 0 && !calibrationDone) {
+      runPattern = false;
+      pausedAfterFirstPoint = true;
+      calibrationDone = true;
+      return lastMarblePosition;
+    }
+#endif
+    // Set LED at end position with end's RGB color (marble does not move)
+    setLedAtPosition(endLED.pos.radial, endLED.pos.angular, endLED.color.r, endLED.color.g, endLED.color.b);
+    unsigned long delayMs = (endLED.type == 1) ? FILL_POINT_DELAY_MS : DETAIL_POINT_DELAY_MS;
+    unsigned long startTime = millis();
+    while ((millis() - startTime) < delayMs && runPattern) {
+      button.tick();
+      delay(1);
+    }
+    // Advance to next segment; completed when we've just processed the last point (index nodes-1)
+    bool patternCompleted = (end == (nodes - 1));
+    start++;
+    if (start >= nodes) start = 0;
+    end = (start + 1) % nodes;
+    previousStart = start;
+    changePoints = true;
+#if !PATTERN_LOOP_ON_COMPLETE
+    if (patternCompleted) {
+      runPattern = false;
+    }
+#endif
+    return lastMarblePosition;
+  }
+
+  // End is type 0 (marble point): move marble from actual position to end.
+  // If start point was type 1/2 we never moved the marble there — use last type-0 position.
+  LEDpos startLED = readLEDposFromPROGMEM(ledPointList, start);
+  Positions lineStart = (startLED.type == 0) ? startPoint : lastMarblePosition;
+  target = drawLine(lineStart, endPoint, current, 100);
 
 #if USE_LED_CIRCLE
   // Update LED with explicit RGB color from LEDpos (not color cycle)
@@ -2712,20 +2805,29 @@ Positions drawPictureStep(const LEDpos *ledPointList, int nodes, Positions curre
   setLedAtPosition(r, theta, currentR, currentG, currentB);
 #endif
 
+#if PAUSE_AFTER_START
+  // Pause only when marble has physically arrived at the first coordinate (current position at startPoint)
+  if (start == 0 && !calibrationDone && current.radial == startPoint.radial && current.angular == startPoint.angular) {
+    calibrationDone = true;
+    runPattern = false;
+    pausedAfterFirstPoint = true;
+    return target;
+  }
+#endif
+
   if ((target.angular == endPoint.angular) && (target.radial == endPoint.radial)) {
     changePoints = true;
     start++;
     end++;
     
-    //Detect when pattern completes a full cycle (start wraps back to 0 from nodes-1)
-    //Before modulo: if previousStart was nodes-1 and start is now nodes, we've completed a cycle
-    bool patternCompleted = (previousStart == (nodes - 1) && start >= nodes);
+    // Completed when we've just reached the last point in the sequence (before looping back)
+    bool patternCompleted = (end == nodes);
     
     start = start % nodes;
     end = end % nodes;
     previousStart = start;
     
-    // Update last marble position for type 1/2 points
+    // Update last marble position for next segment
     lastMarblePosition = target;
 
 #if !PATTERN_LOOP_ON_COMPLETE
