@@ -96,6 +96,37 @@ Useful values and limits for defining how the sand garden will behave. In most c
 #define MAX_BRIGHTNESS   40          //Brightness values are 8-bit for a max of 255 (the range is [0-255]), this sets default maximum to 40 out of 255.
 #define LED_FADE_PERIOD  1000        //Amount of time in milliseconds it takes for LEDs to fade on and off.
 
+//Circular LED display - Set this to true if you have connected a circular LED display under the sand.
+//You will also need to set the constants in the block below.
+#define USE_LED_CIRCLE true
+
+#if USE_LED_CIRCLE
+  #define CIRCULAR_LED_PIN 2           //The output pin for the circular LED display.
+  #define NUM_CIRCULAR_LEDS 241        //Number of LEDs in the circular display.
+  #define NUM_LED_CIRCLES 9            //Number of concentric circles in the LED display
+  #define THETA_OFFSET_JUMP_DEG 5      //Theta offset jump in degrees with left/right joystick press
+
+  int led_per_circle[NUM_LED_CIRCLES] = {60, 48, 40, 32, 24, 16, 12, 8, 1};   // Number of LEDs per circle on LED display (outermost to innermost)
+  int thetaOffset = 0;                 // Theta offset between the Sand Image and the image on the LED display in degrees (-180 to +180) - can adjusted by joystick during drawing
+  
+  //Color cycle for image drawing: White, Red, Orange, Yellow, Green, Cyan, Blue, Purple, Pink
+  #define NUM_IMAGE_COLORS 9
+  CRGB image_led_colors[NUM_IMAGE_COLORS] = {
+    CRGB::White,
+    CRGB(255, 0, 0),      // Ring 0: R (Red)
+    CRGB(255, 64, 0),     // Ring 1: Orange (Red + some Green)
+    CRGB(255, 255, 0),    // Ring 2: RG (Red + Green = Yellow)
+    CRGB(0, 255, 0),      // Ring 3: G (Green)
+    CRGB(0, 255, 255),    // Ring 4: GB (Green + Blue)
+    CRGB(0, 0, 255),      // Ring 4: B (Blue)
+    CRGB(255, 0, 255),    // Ring 6: RB (Red + Blue)
+    CRGB(255, 0, 42)      // Ring 7: Dark Purple
+  };
+
+  CRGB circularLeds[NUM_CIRCULAR_LEDS];   //Circular LED display array
+
+#endif
+
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /*
@@ -265,9 +296,11 @@ public:
  * uses bitwise operations to determine the LED pattern, lighting the LEDs in MediumVioletRed for non-manual patterns.
  */
   void indicatePattern(uint8_t value) {                     //used for showing which pattern is selected
-    FastLED.clear();
+    //Clear only the LED bar, not all LEDs (to preserve circular LED display)
+    for (int i = 0; i < NUM_LEDS; i++) {
+      leds[i] = CRGB::Black;
+    }
     if (value == 255) {                                     //pattern255 is the manual drawing mode.
-      FastLED.clear();
       leds[0] = CRGB::DarkCyan;
     } else {                                                //all other patterns can be displayed with bitwise operations
       for (int i = 0; i < NUM_LEDS; i++) {                  //iterate through each LED in the array
@@ -378,7 +411,6 @@ public:
 //Create an instance of the LedDisplay class that controls the RGB LEDs.
 LedDisplay display;
 
-
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /*
 MISC. GLOBAL VARIABLES.
@@ -426,6 +458,13 @@ void setup() {
 
   FastLED.clear();            //clear the LEDs
   FastLED.show();
+
+#if USE_LED_CIRCLE
+  //Initialize circular LED display
+  FastLED.addLeds<WS2812, CIRCULAR_LED_PIN, GRB>(circularLeds, NUM_CIRCULAR_LEDS);
+  FastLED.clear();
+  FastLED.show();
+#endif
 
   homeRadius();               //crash home the radial axis. This is a blocking function.
 }
@@ -498,6 +537,35 @@ void loop() {
         patternSwitched = true;               //set the flag to indicate that the pattern has been changed
         lastPattern = currentPattern;         //now we can say that the last patten is the current pattern so that this if block will be false until pattern is changed again
       }
+
+#if USE_LED_CIRCLE
+      //Check joystick for theta offset adjustment when drawing (only for Picture pattern)
+      if (currentPattern == 11) {  //Pattern 11 is the Picture pattern
+        joystickValues = readJoystick();
+        if (lastJoystickUpdate >= 200) {  //Debounce joystick input
+          int oldThetaOffset = thetaOffset;
+          if (joystickValues.angular >= 90) {  //Joystick pushed right
+            thetaOffset += THETA_OFFSET_JUMP_DEG * 10;  //Add theta offset jump
+            lastJoystickUpdate = 0;
+          } else if (joystickValues.angular <= -90) {  //Joystick pushed left
+            thetaOffset -= THETA_OFFSET_JUMP_DEG * 10;  //Subtract theta offset jump
+            lastJoystickUpdate = 0;
+          }
+          //Sanitize theta offset to 0-3600 range
+          thetaOffset = thetaOffset % 3600;
+          if (thetaOffset < 0) {
+            thetaOffset += 3600;
+          }
+          //Clear LEDs when offset actually changes
+          if (thetaOffset != oldThetaOffset) {
+            for (int i = 0; i < NUM_CIRCULAR_LEDS; i++) {
+              circularLeds[i] = CRGB::Black;
+            }
+            FastLED.show();
+          }
+        }
+      }
+#endif
 
       //Call the function that will generate the pattern. 
       //This automatically calls the appropriate function from the patterns[] array.
@@ -1905,6 +1973,37 @@ Positions pattern_AccidentalButterfly(Positions current, bool restartPattern = f
 }
 
 
+#if USE_LED_CIRCLE
+/**
+ * @brief Converts r,theta coordinates to LED index on the circular display
+ * 
+ * @param r Radial position (0-1000)
+ * @param theta Angular position in degrees*10 (0-3599)
+ * @return int LED index (0 to NUM_CIRCULAR_LEDS-1)
+ */
+int get_led_number(int r, int theta) {
+    int ring_number = (NUM_LED_CIRCLES-1) - int((r * NUM_LED_CIRCLES) / (1001));
+    
+    int led_ring_start = 0;
+    for (int i = 0; i < ring_number; i++) {
+        led_ring_start += led_per_circle[i];
+    }
+    
+    // Calculate position within the ring: map theta (0-3599) to LED position (0 to led_per_circle[ring_number]-1)
+    // Use float to preserve precision, then round
+    float theta_normalized = (float)(theta % 3600) / 3600.0;
+    int position_in_ring = (int)(theta_normalized * led_per_circle[ring_number] + 0.5); // Add 0.5 for rounding
+    // Ensure we don't go out of bounds
+    if (position_in_ring >= led_per_circle[ring_number]) {
+        position_in_ring = led_per_circle[ring_number] - 1;
+    }
+    // Reverse the direction to make it anticlockwise
+    position_in_ring = (led_per_circle[ring_number] - 1) - position_in_ring;
+    int led_number = led_ring_start + position_in_ring;
+    return led_number;
+}
+#endif
+
 /**
  * HACK BY ORION (AKA: Magicaldroid)
  *
@@ -1913,18 +2012,24 @@ Positions pattern_AccidentalButterfly(Positions current, bool restartPattern = f
  * @param pointList An array of all the points in the pattern stored in a Positions struct.
  * @param current The current position of the gantry, represented as a Positions struct.
  * @param nodes Total number of points in the pattern
+ * @param restartPattern Flag to restart the pattern (clears LEDs)
  * 
  * @return Positions The next target position for the motion controller, represented as a Positions struct.
  * 
  */
-Positions drawPictureStep(Positions *pointList, int nodes, Positions current)
+Positions drawPictureStep(Positions *pointList, int nodes, Positions current, bool restartPattern = false)
 {
   Positions target;
   static int start = 0;
   static int end = 1;
+  static int previousStart = 0;  //Track previous start value to detect cycle completion
   static bool changePoints = true;
   static Positions readStart = {0,0};
   static Positions readEnd = {pgm_read_word(&(pointList[0].radial)), pgm_read_word(&(pointList[0].angular))};
+#if USE_LED_CIRCLE
+  static int currentColorIndex = 0;  //Track which color in the cycle we're using
+  static bool colorInitialized = false;  //Track if color has been initialized
+#endif
   
   uint16_t readValueR;
   uint16_t readValueA;
@@ -1942,12 +2047,67 @@ Positions drawPictureStep(Positions *pointList, int nodes, Positions current)
 
   target = drawLine(startPoint, endPoint, current, 100);
 
+#if USE_LED_CIRCLE
+  //Clear all circular LEDs and reset to white when a new pattern is selected
+  if (restartPattern) {
+    for (int i = 0; i < NUM_CIRCULAR_LEDS; i++) {
+      circularLeds[i] = CRGB::Black;
+    }
+    //Reset to white when switching to a new pattern
+    currentColorIndex = 0;  //Start with first color (White)
+    colorInitialized = true;
+    FastLED.show();
+  }
+
+  //Convert target position back to r,theta format and update circular LED for pattern drawing
+  //target.radial is in steps, convert back to 0-1000 range
+  int r = (int)((float)target.radial * 1000.0 / MAX_R_STEPS);
+  //target.angular is in steps, convert back to degrees*10 (0-3599)
+  int theta = (int)(convertStepsToDegrees(target.angular) * 10.0);
+  
+  //Apply theta offset and sanitize to 0-3600 range
+  theta = theta + thetaOffset;
+  theta = theta % 3600;
+  if (theta < 0) {
+    theta += 3600;
+  }
+  
+  int ledNumber = get_led_number(r, theta);
+  
+  //Draw the pattern: keep previous LEDs on to show the path with color cycle
+  if (ledNumber >= 0 && ledNumber < NUM_CIRCULAR_LEDS) {
+    circularLeds[ledNumber] = image_led_colors[currentColorIndex];
+    FastLED.show();
+  }
+#endif
+
   if ((target.angular == endPoint.angular) && (target.radial == endPoint.radial)) {
     changePoints = true;
     start++;
     end++;
+    
+#if USE_LED_CIRCLE
+    //Detect when pattern completes a full cycle (start wraps back to 0 from nodes-1)
+    //Before modulo: if previousStart was nodes-1 and start is now nodes, we've completed a cycle
+    bool patternCompleted = (previousStart == (nodes - 1) && start >= nodes);
+#endif
+    
     start = start % nodes;
     end = end % nodes;
+    
+#if USE_LED_CIRCLE
+    //Cycle to next color when pattern completes a full cycle (don't clear - trace over existing pattern)
+    if (patternCompleted) {
+      if (colorInitialized) {
+        currentColorIndex = (currentColorIndex + 1) % NUM_IMAGE_COLORS;  //Cycle to next color
+      } else {
+        currentColorIndex = 0;  //Start with first color (White) on first run
+        colorInitialized = true;
+      }
+      //Don't clear LEDs - let it trace over the existing pattern with the new color
+    }
+    previousStart = start;  //Update previous start value
+#endif
   }
   return target;
 }
@@ -2010,7 +2170,7 @@ Positions pattern_Picture(Positions current, bool restartPattern = false) {
   
   };
   
-  return drawPictureStep(pointList, sizeof(pointList) / sizeof(pointList[0]), current);
+  return drawPictureStep(pointList, sizeof(pointList) / sizeof(pointList[0]), current, restartPattern);
 
 }
 
